@@ -1,1420 +1,210 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rise & Run - A Card Game About Straight Lines</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- PeerJS WebRTC Library -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            user-select: none;
-        }
-        h1, h2, h3, .font-heading {
-            font-family: 'Outfit', sans-serif;
-        }
-        /* Custom scrollbars */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(51, 65, 85, 0.8);
-            border-radius: 9999px;
-        }
-        /* Dice 3D rotation animation */
-        .dice-rolling {
-            animation: rollDice 0.6s ease-out;
-        }
-        @keyframes rollDice {
-            0% { transform: rotate(0deg) scale(0.6); }
-            50% { transform: rotate(180deg) scale(1.2); }
-            100% { transform: rotate(360deg) scale(1); }
-        }
-        /* Glowing card animations */
-        .card-playable {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.6), 0 0 30px rgba(16, 185, 129, 0.3);
-            border-color: #10b981 !important;
-        }
-        .card-playable:hover {
-            transform: translateY(-8px) scale(1.04);
-            box-shadow: 0 0 25px rgba(16, 185, 129, 0.9);
-        }
-        .card-disabled {
-            opacity: 0.55;
-            filter: grayscale(30%);
-        }
-        /* Glassmorphism panel */
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-    </style>
-</head>
-<body class="h-full text-slate-100 bg-slate-950 overflow-x-hidden flex flex-col">
-
-    <!-- Top Navigation & Status Bar -->
-    <header class="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-3 flex items-center justify-between z-30 sticky top-0 shadow-lg">
-        <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-cyan-500/20">
-                <i class="fa-solid me-0 fa-chart-line"></i>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-indigo-300 bg-clip-text text-transparent leading-none">
-                    RISE & RUN
-                </h1>
-                <p class="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Straight Lines Card Game</p>
-            </div>
-        </div>
-
-        <div class="flex items-center space-x-2 sm:space-x-4">
-            <!-- Room Code Badge (if in multiplayer) -->
-            <div id="headerRoomBadge" class="hidden flex items-center bg-indigo-950/80 border border-indigo-700/60 rounded-lg px-3 py-1 text-xs text-indigo-200">
-                <span class="text-slate-400 mr-1.5">ROOM:</span>
-                <span id="headerRoomCode" class="font-bold font-mono text-cyan-400 text-sm tracking-widest">----</span>
-                <button onclick="copyShareLink()" class="ml-2 hover:text-white transition-colors" title="Copy Share Link">
-                    <i class="fa-regular fa-copy"></i>
-                </button>
-            </div>
-
-            <!-- Rules Modal Trigger -->
-            <button onclick="toggleModal('rulesModal')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center space-x-1.5">
-                <i class="fa-solid fa-book-open text-cyan-400"></i>
-                <span class="hidden sm:inline">Rules</span>
-            </button>
-
-            <!-- Sound Mute Toggle -->
-            <button id="soundBtn" onclick="toggleSound()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs p-2 rounded-lg border border-slate-700 transition" title="Toggle Sound Effects">
-                <i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Dynamic Application Container -->
-    <main class="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative">
-
-        <!-- ========================================== -->
-        <!-- SCREEN 1: SETUP & LOBBY MENU              -->
-        <!-- ========================================== -->
-        <div id="setupScreen" class="w-full max-w-4xl glass-panel rounded-2xl p-6 sm:p-8 shadow-2xl relative my-auto">
-            
-            <!-- Hero Title & Mode Switcher -->
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center space-x-2 bg-indigo-950/60 border border-indigo-800/50 rounded-full px-4 py-1 text-xs text-indigo-300 mb-3">
-                    <i class="fa-solid fa-graduation-cap text-cyan-400"></i>
-                    <span>Learn Linear Equations & Intercepts</span>
-                </div>
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-2 tracking-tight">Game Setup</h2>
-                <p class="text-slate-400 text-sm max-w-md mx-auto">Choose your game mode and card set to get started.</p>
-            </div>
-
-            <!-- Setup Tabs -->
-            <div class="flex bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 max-w-md mx-auto mb-8">
-                <button id="tabSolo" onclick="switchSetupTab('solo')" class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow">
-                    <i class="fa-solid fa-robot mr-2"></i>Solo vs AI
-                </button>
-                <button id="tabHost" onclick="switchSetupTab('host')" class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-users mr-2"></i>Host Friends
-                </button>
-                <button id="tabJoin" onclick="switchSetupTab('join')" class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-right-to-bracket mr-2"></i>Join Room
-                </button>
-            </div>
-
-            <!-- TAB 1: SOLO MODE OPTIONS -->
-            <div id="panelSolo" class="space-y-6 max-w-md mx-auto">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Your Name</label>
-                    <input type="text" id="soloPlayerName" value="Player 1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500 transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">AI Opponents</label>
-                    <div class="grid grid-cols-3 gap-3">
-                        <button type="button" onclick="setBotCount(1)" id="botBtn1" class="bot-count-btn py-3 rounded-xl border border-indigo-600 bg-indigo-950/60 text-white font-semibold text-sm transition">1 Bot</button>
-                        <button type="button" onclick="setBotCount(2)" id="botBtn2" class="bot-count-btn py-3 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-sm transition">2 Bots</button>
-                        <button type="button" onclick="setBotCount(3)" id="botBtn3" class="bot-count-btn py-3 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-sm transition">3 Bots</button>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Card Deck Mode</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div onclick="setDeckMode(true)" id="deckEasyBtn" class="deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-emerald-500/80 bg-emerald-950/30 text-white transition">
-                            <div class="flex items-center space-x-2 text-emerald-400 font-bold text-sm mb-1">
-                                <i class="fa-solid fa-circle-check"></i>
-                                <span>Easy Mode</span>
-                            </div>
-                            <p class="text-[11px] text-slate-300 leading-tight">Shows blue dot (y-int) & orange dot (x-int) with values.</p>
-                        </div>
-                        <div onclick="setDeckMode(false)" id="deckStandardBtn" class="deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 transition">
-                            <div class="flex items-center space-x-2 font-bold text-sm mb-1 text-slate-200">
-                                <i class="fa-solid fa-brain"></i>
-                                <span>Standard Mode</span>
-                            </div>
-                            <p class="text-[11px] text-slate-400 leading-tight">Clean graphs. Read intercept values directly off grid.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <button onclick="startSoloGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-base rounded-xl shadow-lg shadow-cyan-500/25 transition transform active:scale-[0.99] flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-play"></i>
-                    <span>START GAME</span>
-                </button>
-            </div>
-
-            <!-- TAB 2: HOST MULTIPLAYER -->
-            <div id="panelHost" class="hidden space-y-6 max-w-md mx-auto">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Host Name</label>
-                    <input type="text" id="hostPlayerName" value="Host Player" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500 transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Card Deck Mode</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div onclick="setDeckMode(true)" id="hostDeckEasyBtn" class="deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-emerald-500/80 bg-emerald-950/30 text-white transition">
-                            <div class="font-bold text-emerald-400 text-sm mb-1">Easy Mode</div>
-                            <p class="text-[11px] text-slate-300">Dot guides & values</p>
-                        </div>
-                        <div onclick="setDeckMode(false)" id="hostDeckStandardBtn" class="deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 transition">
-                            <div class="font-bold text-slate-200 text-sm mb-1">Standard Mode</div>
-                            <p class="text-[11px] text-slate-400">Clean graph reading</p>
-                        </div>
-                    </div>
-                </div>
-
-                <button onclick="createHostRoom()" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base rounded-xl shadow-lg shadow-indigo-600/25 transition flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-network-wired"></i>
-                    <span>CREATE ROOM & HOST</span>
-                </button>
-            </div>
-
-            <!-- TAB 3: JOIN MULTIPLAYER -->
-            <div id="panelJoin" class="hidden space-y-6 max-w-md mx-auto">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Your Name</label>
-                    <input type="text" id="joinPlayerName" value="Guest" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500 transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">4-Digit Room Code</label>
-                    <input type="text" id="joinRoomCode" maxlength="4" placeholder="e.g. 5829" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-white text-2xl font-mono tracking-widest uppercase focus:outline-none focus:border-cyan-500 transition">
-                </div>
-
-                <button onclick="joinRoom()" class="w-full py-4 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold text-base rounded-xl shadow-lg shadow-cyan-600/25 transition flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-right-to-bracket"></i>
-                    <span>JOIN GAME</span>
-                </button>
-            </div>
-
-            <!-- LOBBY WAITING SCREEN (Shown after hosting or joining) -->
-            <div id="lobbyView" class="hidden space-y-6 max-w-lg mx-auto">
-                <div class="bg-indigo-950/60 border border-indigo-700/50 rounded-2xl p-6 text-center">
-                    <p class="text-xs font-semibold uppercase tracking-widest text-indigo-300 mb-1">Room Code</p>
-                    <div id="lobbyRoomCode" class="text-4xl font-extrabold font-mono text-cyan-400 tracking-widest mb-3">5829</div>
-                    
-                    <div class="flex items-center justify-center space-x-2">
-                        <button onclick="copyShareLink()" class="bg-indigo-900/80 hover:bg-indigo-800 text-xs text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-700/60 transition flex items-center space-x-1">
-                            <i class="fa-regular fa-copy"></i>
-                            <span>Copy Direct Link</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Joined Players (<span id="playerCount">1</span>/6)</span>
-                        <button id="addAiBtn" onclick="addAiBotToLobby()" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2.5 py-1 rounded-lg border border-slate-700 transition">
-                            <i class="fa-solid fa-plus mr-1"></i>Add AI Bot
-                        </button>
-                    </div>
-                    <div id="lobbyPlayerList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        <!-- Dynamic list of players -->
-                    </div>
-                </div>
-
-                <div id="hostLobbyControls" class="pt-2">
-                    <button onclick="startMultiplayerGame()" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-base rounded-xl shadow-lg shadow-emerald-500/25 transition">
-                        START MATCH NOW
-                    </button>
-                </div>
-                <div id="clientLobbyWait" class="hidden text-center text-slate-400 text-sm py-3">
-                    <i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-2"></i>Waiting for Host to start match...
-                </div>
-            </div>
-
-        </div>
-
-
-        <!-- ========================================== -->
-        <!-- SCREEN 2: GAME BOARD TABLE                -->
-        <!-- ========================================== -->
-        <div id="gameScreen" class="hidden w-full max-w-6xl flex-1 flex flex-col justify-between space-y-4 my-auto">
-            
-            <!-- TOP AREA: OPPONENTS ROW -->
-            <div id="opponentsRow" class="flex items-center justify-center gap-3 sm:gap-6 flex-wrap px-2">
-                <!-- Opponent cards rendered dynamically -->
-            </div>
-
-            <!-- CENTER TABLE FIELD -->
-            <div class="glass-panel rounded-2xl p-4 sm:p-6 shadow-2xl relative flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
-                
-                <!-- Left Info & Turn Banner -->
-                <div class="flex-1 w-full text-center md:text-left space-y-2">
-                    <div id="turnBadge" class="inline-flex items-center space-x-2 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 border border-cyan-500/40 text-cyan-300 rounded-full px-4 py-1 text-xs font-semibold">
-                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                        <span id="turnPlayerText">Player 1's Turn</span>
-                    </div>
-
-                    <div id="rollNotice" class="text-sm font-medium text-slate-300 min-h-[40px] flex items-center justify-center md:justify-start">
-                        <span>Roll the die to start turn!</span>
-                    </div>
-                </div>
-
-                <!-- Center Cards: Draw Pile & Discard Pile -->
-                <div class="flex items-center space-x-6 sm:space-x-10 my-2">
-                    
-                    <!-- Draw Pile Stack -->
-                    <div class="flex flex-col items-center">
-                        <div id="drawPileBtn" onclick="userDrawCard()" class="w-28 sm:w-32 h-40 sm:h-44 rounded-xl bg-slate-900 border-2 border-indigo-700/60 shadow-xl flex flex-col items-center justify-center relative cursor-pointer hover:border-cyan-400 transition transform hover:scale-105 group">
-                            <!-- Card Back Graphic pattern -->
-                            <div class="w-[90%] h-[92%] rounded-lg bg-indigo-950 border border-indigo-800/80 flex flex-col items-center justify-center p-2 text-center">
-                                <i class="fa-solid fa-layer-group text-2xl text-indigo-400 group-hover:text-cyan-400 mb-1 transition"></i>
-                                <span class="text-[10px] font-bold tracking-widest text-indigo-300">RISE & RUN</span>
-                            </div>
-                            <!-- Counter Badge -->
-                            <span id="deckCountBadge" class="absolute -top-2.5 -right-2.5 bg-indigo-600 text-white font-bold text-xs w-7 h-7 rounded-full flex items-center justify-center border-2 border-slate-950 shadow">
-                                34
-                            </span>
-                        </div>
-                        <span class="text-[11px] text-slate-400 mt-2 font-medium">Draw Deck</span>
-                    </div>
-
-                    <!-- Discard Pile Top Card Canvas -->
-                    <div class="flex flex-col items-center">
-                        <div class="w-32 sm:w-36 h-48 sm:h-52 rounded-xl bg-white shadow-2xl p-1 relative border-2 border-slate-700 transition transform">
-                            <canvas id="discardCanvas" class="w-full h-full rounded-lg"></canvas>
-                        </div>
-                        <span class="text-[11px] text-slate-400 mt-2 font-medium">Top Discard Card</span>
-                    </div>
-
-                </div>
-
-                <!-- Right Station: Dice Rolling Controller -->
-                <div class="flex-1 w-full flex flex-col items-center md:items-end justify-center space-y-3">
-                    <div id="diceCube" class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 border-2 border-slate-700 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl text-cyan-400 shadow-xl font-bold font-mono">
-                        <i class="fa-solid fa-dice-d6 text-slate-600"></i>
-                    </div>
-
-                    <div class="flex flex-col w-full sm:w-auto space-y-2">
-                        <button id="rollDiceBtn" onclick="userRollDice()" class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-orange-500/20 transition transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center space-x-2">
-                            <i class="fa-solid fa-dice"></i>
-                            <span>ROLL DIE</span>
-                        </button>
-
-                        <button id="drawEndTurnBtn" onclick="userDrawCard()" disabled class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700 transition disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center space-x-1.5">
-                            <i class="fa-solid fa-hand-holding"></i>
-                            <span>Draw Card / End Turn</span>
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- BOTTOM AREA: HUMAN PLAYER HAND -->
-            <div class="glass-panel rounded-2xl p-4 sm:p-5 shadow-2xl border border-slate-800">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center space-x-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Your Hand (<span id="myHandCount">0</span> cards)</span>
-                        <span id="handStatusTip" class="text-[11px] text-emerald-400 font-medium"></span>
-                    </div>
-                    
-                    <button onclick="challengeLastPlay()" id="challengeBtn" class="text-xs bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 px-3 py-1.5 rounded-lg border border-rose-800/60 transition flex items-center space-x-1">
-                        <i class="fa-solid fa-gavel"></i>
-                        <span>Challenge Play</span>
-                    </button>
-                </div>
-
-                <!-- Scrollable Hand Grid -->
-                <div id="playerHandGrid" class="flex items-center gap-3 overflow-x-auto pb-2 pt-1 px-1 min-h-[220px]">
-                    <!-- Canvas cards rendered here -->
-                </div>
-            </div>
-
-            <!-- BOTTOM LOG STREAM -->
-            <div class="glass-panel rounded-xl p-3 text-xs text-slate-400 flex items-center justify-between">
-                <div class="flex items-center space-x-2 overflow-hidden">
-                    <span class="font-bold text-cyan-400 shrink-0">LOG:</span>
-                    <span id="latestLogText" class="truncate text-slate-300">Game initialized. Shuffling deck...</span>
-                </div>
-                <button onclick="toggleModal('logModal')" class="text-slate-400 hover:text-white ml-2 shrink-0 text-[11px] underline">View All</button>
-            </div>
-
-        </div>
-
-    </main>
-
-    <!-- ========================================== -->
-    <!-- MODALS & OVERLAYS                         -->
-    <!-- ========================================== -->
-
-    <!-- 1. RULES & MATH QUICK REFERENCE MODAL -->
-    <div id="rulesModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass-panel w-full max-w-2xl rounded-2xl p-6 shadow-2xl border border-slate-700 max-h-[90vh] flex flex-col">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-800">
-                <h3 class="text-xl font-bold text-white flex items-center space-x-2">
-                    <i class="fa-solid fa-book-open text-cyan-400"></i>
-                    <span>Rise & Run Official Rules</span>
-                </h3>
-                <button onclick="toggleModal('rulesModal')" class="text-slate-400 hover:text-white p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto py-4 space-y-4 text-xs sm:text-sm text-slate-300">
-                <div class="bg-indigo-950/40 p-3 rounded-xl border border-indigo-800/40">
-                    <h4 class="font-bold text-cyan-300 mb-1">Aim of the Game</h4>
-                    <p>Be the first player to play all of your cards. Match the top card of the discard pile based on your die roll.</p>
-                </div>
-
-                <div class="space-y-2">
-                    <h4 class="font-bold text-white uppercase text-xs tracking-wider text-slate-400">Dice Roll Matching Rules</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-amber-400">Roll 1 - No Luck!</span>
-                            <p class="text-slate-400">Turn ends immediately. Cannot play card.</p>
-                        </div>
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-cyan-400">Roll 2 - Parallel</span>
-                            <p class="text-slate-400">Same gradient $m$. Horizontal lines parallel to horizontal, vertical to vertical.</p>
-                        </div>
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-cyan-400">Roll 3 - Perpendicular</span>
-                            <p class="text-slate-400">Gradients multiply to $-1$ ($m_1 \cdot m_2 = -1$). Horizontal & Vertical are perpendicular.</p>
-                        </div>
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-cyan-400">Roll 4 - Same y-intercept</span>
-                            <p class="text-slate-400">Same $c$ value. Wildcard: $x=0$ matches any y-intercept!</p>
-                        </div>
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-cyan-400">Roll 5 - Same x-intercept</span>
-                            <p class="text-slate-400">Same x-intercept point. Wildcard: $y=0$ matches any x-intercept!</p>
-                        </div>
-                        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span class="font-bold text-emerald-400">Roll 6 - Drop Any Card!</span>
-                            <p class="text-slate-400">Wildcard Roll: Drop any card of your choice.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1 text-xs">
-                    <h4 class="font-bold text-amber-300">Challenge Rule</h4>
-                    <p>If an incorrect card play is challenged: If invalid, player takes back card + draws 1 penalty card. If valid, challenger draws 1 card.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. FULL GAME LOG MODAL -->
-    <div id="logModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-slate-700 h-[70vh] flex flex-col">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 class="text-lg font-bold text-white">Full Game History</h3>
-                <button onclick="toggleModal('logModal')" class="text-slate-400 hover:text-white p-1">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div id="fullLogList" class="flex-1 overflow-y-auto py-3 space-y-2 text-xs font-mono text-slate-300 pr-1">
-                <!-- Log entries -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. VICTORY / WINNER MODAL -->
-    <div id="winnerModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="glass-panel w-full max-w-md rounded-2xl p-8 text-center shadow-2xl border border-cyan-500/50 relative overflow-hidden">
-            <div class="w-20 h-20 bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-xl shadow-amber-400/30 animate-bounce">
-                <i class="fa-solid fa-trophy"></i>
-            </div>
-            <h2 class="text-3xl font-extrabold text-white mb-1">VICTORY!</h2>
-            <p id="winnerText" class="text-lg font-bold text-cyan-400 mb-6">Player 1 wins the game!</p>
-
-            <button onclick="resetToSetup()" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg transition">
-                PLAY AGAIN
-            </button>
-        </div>
-    </div>
-
-    <!-- TOAST NOTIFICATIONS -->
-    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-900 border border-cyan-500/60 text-cyan-200 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold flex items-center space-x-2 transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none">
-        <i class="fa-solid fa-circle-info text-cyan-400"></i>
-        <span id="toastMsg">Notification message</span>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- JAVASCRIPT GAME ENGINE                    -->
-    <!-- ========================================== -->
-    <script>
-        // --- DECK DATA CONSTANTS (44 Official Cards) ---
-        const FULL_CARD_DECK = [
-            { id: 1, eq: "y = x", m: 1, c: 0, x_int: 0 },
-            { id: 2, eq: "y = -x", m: -1, c: 0, x_int: 0 },
-            { id: 3, eq: "y = 0.5x", m: 0.5, c: 0, x_int: 0 },
-            { id: 4, eq: "y = -0.5x", m: -0.5, c: 0, x_int: 0 },
-            { id: 5, eq: "y = 2x", m: 2, c: 0, x_int: 0 },
-            { id: 6, eq: "y = -2x", m: -2, c: 0, x_int: 0 },
-            { id: 7, eq: "y = 0", m: 0, c: 0, x_int: "any", isWildcardX: true },
-            { id: 8, eq: "x = 0", m: "vert", c: "any", x_int: 0, isWildcardY: true },
-            { id: 9, eq: "y = 3", m: 0, c: 3, x_int: "none" },
-            { id: 10, eq: "y = -3", m: 0, c: -3, x_int: "none" },
-            { id: 11, eq: "y = 6", m: 0, c: 6, x_int: "none" },
-            { id: 12, eq: "y = -6", m: 0, c: -6, x_int: "none" },
-            { id: 13, eq: "y = 12", m: 0, c: 12, x_int: "none" },
-            { id: 14, eq: "y = -12", m: 0, c: -12, x_int: "none" },
-            { id: 15, eq: "x = 3", m: "vert", c: "none", x_int: 3 },
-            { id: 16, eq: "x = -3", m: "vert", c: "none", x_int: -3 },
-            { id: 17, eq: "x = 6", m: "vert", c: "none", x_int: 6 },
-            { id: 18, eq: "x = -6", m: "vert", c: "none", x_int: -6 },
-            { id: 19, eq: "x = 12", m: "vert", c: "none", x_int: 12 },
-            { id: 20, eq: "x = -12", m: "vert", c: "none", x_int: -12 },
-            { id: 21, eq: "y = x + 3", m: 1, c: 3, x_int: -3 },
-            { id: 22, eq: "y = x - 3", m: 1, c: -3, x_int: 3 },
-            { id: 23, eq: "y = -x + 3", m: -1, c: 3, x_int: 3 },
-            { id: 24, eq: "y = -x - 3", m: -1, c: -3, x_int: -3 },
-            { id: 25, eq: "y = 0.5x + 3", m: 0.5, c: 3, x_int: -6 },
-            { id: 26, eq: "y = 0.5x - 3", m: 0.5, c: -3, x_int: 6 },
-            { id: 27, eq: "y = -0.5x + 3", m: -0.5, c: 3, x_int: 6 },
-            { id: 28, eq: "y = -0.5x - 3", m: -0.5, c: -3, x_int: -6 },
-            { id: 29, eq: "y = 2x + 6", m: 2, c: 6, x_int: -3 },
-            { id: 30, eq: "y = 2x - 6", m: 2, c: -6, x_int: 3 },
-            { id: 31, eq: "y = -2x + 6", m: -2, c: 6, x_int: 3 },
-            { id: 32, eq: "y = -2x - 6", m: -2, c: -6, x_int: -3 },
-            { id: 33, eq: "y = x + 6", m: 1, c: 6, x_int: -6 },
-            { id: 34, eq: "y = x - 6", m: 1, c: -6, x_int: 6 },
-            { id: 35, eq: "y = -x + 6", m: -1, c: 6, x_int: 6 },
-            { id: 36, eq: "y = -x - 6", m: -1, c: -6, x_int: -6 },
-            { id: 37, eq: "y = 0.5x + 6", m: 0.5, c: 6, x_int: -12 },
-            { id: 38, eq: "y = 0.5x - 6", m: 0.5, c: -6, x_int: 12 },
-            { id: 39, eq: "y = -0.5x + 6", m: -0.5, c: 6, x_int: 12 },
-            { id: 40, eq: "y = -0.5x - 6", m: -0.5, c: -6, x_int: -12 },
-            { id: 41, eq: "y = 2x + 12", m: 2, c: 12, x_int: -6 },
-            { id: 42, eq: "y = 2x - 12", m: 2, c: -12, x_int: 6 },
-            { id: 43, eq: "y = -2x + 12", m: -2, c: 12, x_int: 6 },
-            { id: 44, eq: "y = -2x - 12", m: -2, c: -12, x_int: -6 }
-        ];
-
-        // --- GLOBAL STATE ---
-        let gameConfig = {
-            mode: 'solo', // 'solo', 'host', 'join'
-            easyMode: true,
-            botCount: 1,
-            roomCode: '',
-            localPlayerId: 'p_' + Math.random().toString(36).substring(2, 7)
-        };
-
-        let gameState = {
-            players: [], // { id, name, isBot, hand: [] }
-            turnOrder: [], // shuffled player indices
-            currentTurnIndex: 0,
-            drawPile: [],
-            discardPile: [],
-            currentRoll: null, // null or 1..6
-            hasRolledThisTurn: false,
-            lastPlayedCard: null,
-            lastPlayValid: true,
-            easyMode: true,
-            gameActive: false,
-            logs: []
-        };
-
-        let audioEnabled = true;
-        let audioCtx = null;
-        let broadcastChan = null;
-        let peerInstance = null;
-        let peerConnections = [];
-
-        // --- WEB AUDIO SYNTHESIZER ---
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-
-        function playSound(type) {
-            if (!audioEnabled) return;
-            initAudio();
-            if (!audioCtx) return;
-
-            const now = audioCtx.currentTime;
-
-            if (type === 'dice') {
-                for (let i = 0; i < 4; i++) {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(150 + Math.random() * 300, now + i * 0.08);
-                    gain.gain.setValueAtTime(0.15, now + i * 0.08);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.06);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(now + i * 0.08);
-                    osc.stop(now + i * 0.08 + 0.06);
-                }
-            } else if (type === 'card') {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, now);
-                osc.frequency.exponentialRampToValueAtTime(120, now + 0.12);
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now);
-                osc.stop(now + 0.12);
-            } else if (type === 'win') {
-                [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-                    gain.gain.setValueAtTime(0.2, now + idx * 0.12);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.3);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(now + idx * 0.12);
-                    osc.stop(now + idx * 0.12 + 0.3);
-                });
-            }
-        }
-
-        function toggleSound() {
-            audioEnabled = !audioEnabled;
-            const icon = document.getElementById('soundIcon');
-            icon.className = audioEnabled ? "fa-solid fa-volume-high text-emerald-400" : "fa-solid fa-volume-xmark text-slate-500";
-            showToast(audioEnabled ? "Sound enabled" : "Sound muted");
-        }
-
-        // --- MATH ENGINE & MATCH VALIDATOR ---
-        function isMatch(card, topCard, roll) {
-            if (roll === 1) return false; // No Luck!
-            if (roll === 6) return true;  // Drop Any Card!
-
-            if (roll === 2) { // Parallel (Same gradient)
-                return card.m === topCard.m;
-            }
-
-            if (roll === 3) { // Perpendicular (m1 * m2 = -1 or Horiz ⊥ Vert)
-                if ((card.m === 0 && topCard.m === 'vert') || (card.m === 'vert' && topCard.m === 0)) {
-                    return true;
-                }
-                if (typeof card.m === 'number' && typeof topCard.m === 'number' && card.m !== 0 && topCard.m !== 0) {
-                    return Math.abs(card.m * topCard.m + 1) < 0.001;
-                }
-                return false;
-            }
-
-            if (roll === 4) { // Same y-intercept
-                if (card.isWildcardY || topCard.isWildcardY) return true; // x=0 wildcard
-                if (card.c !== 'none' && topCard.c !== 'none') {
-                    return card.c === topCard.c;
-                }
-                return false;
-            }
-
-            if (roll === 5) { // Same x-intercept
-                if (card.isWildcardX || topCard.isWildcardX) return true; // y=0 wildcard
-                if (card.x_int !== 'none' && topCard.x_int !== 'none') {
-                    return card.x_int === topCard.x_int;
-                }
-                return false;
-            }
-
-            return false;
-        }
-
-        function getMatchReason(card, topCard, roll) {
-            if (roll === 6) return `Wildcard roll 6! Played ${card.eq}.`;
-            if (roll === 2) return `Parallel lines! Gradient m = ${card.m}.`;
-            if (roll === 3) {
-                if (card.m === 0 || card.m === 'vert') return `Horizontal & Vertical lines are always perpendicular!`;
-                return `Perpendicular gradients! (${card.m} × ${topCard.m} = -1).`;
-            }
-            if (roll === 4) return `Same y-intercept! c = ${card.c === 'any' ? 'wildcard' : card.c}.`;
-            if (roll === 5) return `Same x-intercept! x = ${card.x_int === 'any' ? 'wildcard' : card.x_int}.`;
-            return `Valid match!`;
-        }
-
-        // --- HTML5 CANVAS CARD RENDERER ---
-        function renderCardOnCanvas(canvas, card, isEasyMode, width = 160, height = 230) {
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-
-            // Background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, width, height);
-
-            // Card Header
-            const pad = Math.floor(width * 0.08);
-            const gridW = width - pad * 2;
-            const gridH = Math.floor(height * 0.62);
-            const gridTop = Math.floor(height * 0.18);
-            const gridLeft = pad;
-            const cx = gridLeft + gridW / 2;
-            const cy = gridTop + gridH / 2;
-            const scaleX = gridW / 26;
-            const scaleY = gridH / 26;
-
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, width, gridTop);
-
-            // Equation Title
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = `bold ${Math.floor(width * 0.1)}px Outfit, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(card.eq, width / 2, gridTop / 2);
-
-            // Grid Background
-            ctx.fillStyle = '#f8fafc';
-            ctx.fillRect(gridLeft, gridTop, gridW, gridH);
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 1;
-
-            // Grid Lines (every 3 units)
-            for (let i = -12; i <= 12; i += 3) {
-                if (i === 0) continue;
-                const gx = cx + i * scaleX;
-                ctx.beginPath();
-                ctx.moveTo(gx, gridTop);
-                ctx.lineTo(gx, gridTop + gridH);
-                ctx.stroke();
-
-                const gy = cy - i * scaleY;
-                ctx.beginPath();
-                ctx.moveTo(gridLeft, gy);
-                ctx.lineTo(gridLeft + gridW, gy);
-                ctx.stroke();
-            }
-
-            // Axes X & Y
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(cx, gridTop);
-            ctx.lineTo(cx, gridTop + gridH);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(gridLeft, cy);
-            ctx.lineTo(gridLeft + gridW, cy);
-            ctx.stroke();
-
-            // Draw Line
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(gridLeft, gridTop, gridW, gridH);
-            ctx.clip();
-
-            ctx.strokeStyle = '#dc2626';
-            ctx.lineWidth = 3.5;
-            ctx.beginPath();
-
-            if (card.m === 'vert') {
-                const lx = cx + card.x_int * scaleX;
-                ctx.moveTo(lx, gridTop);
-                ctx.lineTo(lx, gridTop + gridH);
-            } else if (card.m === 0) {
-                const ly = cy - card.c * scaleY;
-                ctx.moveTo(gridLeft, ly);
-                ctx.lineTo(gridLeft + gridW, ly);
-            } else {
-                const x1 = -15;
-                const y1 = card.m * x1 + card.c;
-                const x2 = 15;
-                const y2 = card.m * x2 + card.c;
-                ctx.moveTo(cx + x1 * scaleX, cy - y1 * scaleY);
-                ctx.lineTo(cx + x2 * scaleX, cy - y2 * scaleY);
-            }
-            ctx.stroke();
-            ctx.restore();
-
-            // Easy Mode Intercept Dots & Footer Text
-            const footerTop = gridTop + gridH;
-            const footerH = height - footerTop;
-            ctx.fillStyle = isEasyMode ? '#f1f5f9' : '#ffffff';
-            ctx.fillRect(0, footerTop, width, footerH);
-
-            if (isEasyMode) {
-                const dotR = Math.max(4, Math.floor(width * 0.04));
-
-                // Blue dot (y-intercept)
-                if (card.c !== 'none' && card.c !== 'any') {
-                    const dy = cy - card.c * scaleY;
-                    if (dy >= gridTop && dy <= gridTop + gridH) {
-                        ctx.beginPath();
-                        ctx.arc(cx, dy, dotR, 0, Math.PI * 2);
-                        ctx.fillStyle = '#2563eb';
-                        ctx.fill();
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.5;
-                        ctx.stroke();
-                    }
-                }
-
-                // Orange dot (x-intercept)
-                if (card.x_int !== 'none' && card.x_int !== 'any') {
-                    const dx = cx + card.x_int * scaleX;
-                    if (dx >= gridLeft && dx <= gridLeft + gridW) {
-                        ctx.beginPath();
-                        ctx.arc(dx, cy, dotR, 0, Math.PI * 2);
-                        ctx.fillStyle = '#ea580c';
-                        ctx.fill();
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.5;
-                        ctx.stroke();
-                    }
-                }
-
-                // Legend footer
-                ctx.font = `600 ${Math.floor(width * 0.045)}px Inter, sans-serif`;
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#1d4ed8';
-                const yStr = card.isWildcardY ? 'y-int: wildcard' : (card.c === 'none' ? 'y-int: none' : `y-int: ${card.c}`);
-                ctx.fillText('🔵 ' + yStr, pad, footerTop + footerH * 0.4);
-
-                ctx.fillStyle = '#c2410c';
-                const xStr = card.isWildcardX ? 'x-int: wildcard' : (card.x_int === 'none' ? 'x-int: none' : `x-int: ${card.x_int}`);
-                ctx.fillText('🟠 ' + xStr, pad, footerTop + footerH * 0.8);
-            } else {
-                ctx.fillStyle = '#64748b';
-                ctx.font = `600 ${Math.floor(width * 0.04)}px Inter, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.fillText('RISE & RUN', width / 2, footerTop + footerH / 2);
-            }
-        }
-
-        // --- GAME LOGIC ENGINE ---
-        function initGame(playersList, easyMode) {
-            gameState.easyMode = easyMode;
-            gameState.players = playersList;
-            
-            // Randomize turn order
-            gameState.turnOrder = Array.from({ length: playersList.length }, (_, i) => i);
-            shuffleArray(gameState.turnOrder);
-            gameState.currentTurnIndex = 0;
-
-            // Prepare Deck
-            const fullDeckCopy = JSON.parse(JSON.stringify(FULL_CARD_DECK));
-            shuffleArray(fullDeckCopy);
-
-            // Deal 5 cards to each player
-            gameState.players.forEach(p => {
-                p.hand = fullDeckCopy.splice(0, 5);
-            });
-
-            // Start Discard Pile with 1 face-up card
-            gameState.discardPile = [fullDeckCopy.pop()];
-            gameState.drawPile = fullDeckCopy;
-
-            gameState.currentRoll = null;
-            gameState.hasRolledThisTurn = false;
-            gameState.gameActive = true;
-            gameState.logs = [];
-
-            logAction(`Game started! Player order randomized: ${gameState.turnOrder.map(i => gameState.players[i].name).join(' ➔ ')}`);
-
-            updateUI();
-            checkAITurn();
-        }
-
-        function getCurrentTurnPlayer() {
-            const idx = gameState.turnOrder[gameState.currentTurnIndex];
-            return gameState.players[idx];
-        }
-
-        function isLocalPlayerTurn() {
-            const player = getCurrentTurnPlayer();
-            return player && player.id === gameConfig.localPlayerId;
-        }
-
-        function rollDice() {
-            if (!gameState.gameActive || gameState.hasRolledThisTurn) return;
-
-            const roll = Math.floor(Math.random() * 6) + 1;
-            gameState.currentRoll = roll;
-            gameState.hasRolledThisTurn = true;
-
-            const player = getCurrentTurnPlayer();
-            playSound('dice');
-
-            const rollDescriptions = {
-                1: "No Luck! Turn ends immediately.",
-                2: "Parallel (Match Gradient m)",
-                3: "Perpendicular (m1 × m2 = -1)",
-                4: "Same y-intercept (c value)",
-                5: "Same x-intercept (x-int value)",
-                6: "Drop Any Card! (Wildcard Roll)"
-            };
-
-            logAction(`${player.name} rolled a 🎲 ${roll}: ${rollDescriptions[roll]}`);
-
-            // Roll 1: Turn ends immediately
-            if (roll === 1) {
-                setTimeout(() => {
-                    logAction(`${player.name} got No Luck! Turn passed.`);
-                    nextTurn();
-                }, 1400);
-            }
-
-            updateUI();
-        }
-
-        function playCard(cardIndex) {
-            if (!gameState.gameActive || !gameState.hasRolledThisTurn) return;
-            const player = getCurrentTurnPlayer();
-            const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-            const card = player.hand[cardIndex];
-
-            if (!card) return;
-
-            const valid = isMatch(card, topCard, gameState.currentRoll);
-
-            if (!valid) {
-                showToast("This card doesn't match the current roll requirement!");
-                return;
-            }
-
-            // Remove card from hand & put on discard pile
-            player.hand.splice(cardIndex, 1);
-            gameState.discardPile.push(card);
-            gameState.lastPlayedCard = card;
-            gameState.lastPlayValid = true;
-
-            playSound('card');
-            logAction(`${player.name} played [${card.eq}]. ${getMatchReason(card, topCard, gameState.currentRoll)}`);
-
-            // Check Win condition
-            if (player.hand.length === 0) {
-                gameState.gameActive = false;
-                playSound('win');
-                logAction(`🎉 ${player.name} played their last card and won the game!`);
-                showWinnerModal(player.name);
-                updateUI();
-                return;
-            }
-
-            nextTurn();
-        }
-
-        function drawCard() {
-            if (!gameState.gameActive || !gameState.hasRolledThisTurn) return;
-            const player = getCurrentTurnPlayer();
-
-            // Refill draw pile if empty
-            if (gameState.drawPile.length === 0) {
-                const topCard = gameState.discardPile.pop();
-                gameState.drawPile = gameState.discardPile;
-                shuffleArray(gameState.drawPile);
-                gameState.discardPile = [topCard];
-                logAction(`Draw deck replenished from discard pile.`);
-            }
-
-            if (gameState.drawPile.length > 0) {
-                const drawn = gameState.drawPile.pop();
-                player.hand.push(drawn);
-                playSound('card');
-                logAction(`${player.name} drew 1 card.`);
-            }
-
-            nextTurn();
-        }
-
-        function nextTurn() {
-            gameState.currentRoll = null;
-            gameState.hasRolledThisTurn = false;
-            gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
-
-            updateUI();
-            checkAITurn();
-        }
-
-        function challengeLastPlay() {
-            if (!gameState.lastPlayedCard) {
-                showToast("No card played yet to challenge!");
-                return;
-            }
-            logAction(`⚖️ Challenge initiated on last play! Play verified: VALID.`);
-            showToast("Play was valid! Challenger draws 1 penalty card.");
-            const localP = gameState.players.find(p => p.id === gameConfig.localPlayerId);
-            if (localP && gameState.drawPile.length > 0) {
-                localP.hand.push(gameState.drawPile.pop());
-                updateUI();
-            }
-        }
-
-        // --- AI BOT LOGIC ---
-        function checkAITurn() {
-            if (!gameState.gameActive) return;
-            const player = getCurrentTurnPlayer();
-
-            if (player && player.isBot) {
-                setTimeout(() => {
-                    // Step 1: AI Rolls Die
-                    rollDice();
-
-                    if (gameState.currentRoll === 1) return; // Turn ends on 1
-
-                    // Step 2: AI looks for valid cards
-                    setTimeout(() => {
-                        const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-                        let validIndices = [];
-
-                        player.hand.forEach((card, idx) => {
-                            if (isMatch(card, topCard, gameState.currentRoll)) {
-                                validIndices.push(idx);
-                            }
-                        });
-
-                        if (validIndices.length > 0) {
-                            // Prefer playing non-wildcards first
-                            const chosenIdx = validIndices[0];
-                            playCard(chosenIdx);
-                        } else {
-                            // No match: AI draws a card & ends turn
-                            drawCard();
-                        }
-                    }, 1200);
-
-                }, 800);
-            }
-        }
-
-        // --- UI UPDATER ---
-        function updateUI() {
-            if (!gameState.gameActive) return;
-
-            const curPlayer = getCurrentTurnPlayer();
-            const isMyTurn = isLocalPlayerTurn();
-            const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-
-            // Update Header Room Code
-            if (gameConfig.mode !== 'solo' && gameConfig.roomCode) {
-                document.getElementById('headerRoomBadge').classList.remove('hidden');
-                document.getElementById('headerRoomCode').innerText = gameConfig.roomCode;
-            }
-
-            // Update Top Card Canvas
-            const discardCanvas = document.getElementById('discardCanvas');
-            renderCardOnCanvas(discardCanvas, topCard, gameState.easyMode, 150, 210);
-
-            // Update Deck Counter
-            document.getElementById('deckCountBadge').innerText = gameState.drawPile.length;
-
-            // Update Turn Badge & Dice Status
-            const turnText = document.getElementById('turnPlayerText');
-            turnText.innerText = isMyTurn ? "YOUR TURN!" : `${curPlayer.name}'s Turn`;
-
-            const rollNotice = document.getElementById('rollNotice');
-            if (gameState.currentRoll) {
-                rollNotice.innerHTML = `<span class="text-amber-400 font-bold">Rolled 🎲 ${gameState.currentRoll}</span>: ${getRollRuleName(gameState.currentRoll)}`;
-            } else {
-                rollNotice.innerHTML = isMyTurn ? "Roll the die to see your match rule!" : `Waiting for ${curPlayer.name}...`;
-            }
-
-            // Dice Cube Display
-            const diceCube = document.getElementById('diceCube');
-            if (gameState.currentRoll) {
-                const diceIcons = ['fa-dice-one', 'fa-dice-two', 'fa-dice-three', 'fa-dice-four', 'fa-dice-five', 'fa-dice-six'];
-                diceCube.innerHTML = `<i class="fa-solid ${diceIcons[gameState.currentRoll - 1]}"></i>`;
-            } else {
-                diceCube.innerHTML = `<i class="fa-solid fa-dice-d6 text-slate-600"></i>`;
-            }
-
-            // Controls Enable/Disable
-            const rollBtn = document.getElementById('rollDiceBtn');
-            const drawBtn = document.getElementById('drawEndTurnBtn');
-
-            rollBtn.disabled = !isMyTurn || gameState.hasRolledThisTurn;
-            drawBtn.disabled = !isMyTurn || !gameState.hasRolledThisTurn;
-
-            // Render Opponents
-            const oppRow = document.getElementById('opponentsRow');
-            oppRow.innerHTML = '';
-
-            gameState.players.forEach((p, idx) => {
-                if (p.id === gameConfig.localPlayerId) return; // Skip human self
-
-                const isTurn = (gameState.turnOrder[gameState.currentTurnIndex] === idx);
-                const oppDiv = document.createElement('div');
-                oppDiv.className = `flex items-center space-x-2 bg-slate-900/80 border ${isTurn ? 'border-cyan-400 ring-2 ring-cyan-500/30' : 'border-slate-800'} rounded-xl px-3 py-2 text-xs`;
-
-                oppDiv.innerHTML = `
-                    <div class="w-7 h-7 rounded-full ${p.isBot ? 'bg-indigo-600' : 'bg-emerald-600'} flex items-center justify-center font-bold text-white text-[11px]">
-                        ${p.isBot ? '<i class="fa-solid fa-robot"></i>' : p.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                        <div class="font-bold text-slate-200 flex items-center space-x-1">
-                            <span>${p.name}</span>
-                            ${isTurn ? '<i class="fa-solid fa-dice text-amber-400 text-[10px]"></i>' : ''}
-                        </div>
-                        <div class="text-[10px] text-slate-400 font-medium">${p.hand.length} cards remaining</div>
-                    </div>
-                `;
-                oppRow.appendChild(oppDiv);
-            });
-
-            // Render Local Player Hand
-            const myPlayer = gameState.players.find(p => p.id === gameConfig.localPlayerId);
-            const handGrid = document.getElementById('playerHandGrid');
-            handGrid.innerHTML = '';
-
-            if (myPlayer) {
-                document.getElementById('myHandCount').innerText = myPlayer.hand.length;
-
-                let playableCount = 0;
-
-                myPlayer.hand.forEach((card, cIdx) => {
-                    const cardWrapper = document.createElement('div');
-                    const playable = isMyTurn && gameState.hasRolledThisTurn && isMatch(card, topCard, gameState.currentRoll);
-
-                    if (playable) playableCount++;
-
-                    cardWrapper.className = `shrink-0 rounded-xl bg-white p-1 shadow-lg border-2 transition duration-200 cursor-pointer ${playable ? 'card-playable border-emerald-500' : (isMyTurn && gameState.hasRolledThisTurn ? 'card-disabled border-slate-300' : 'border-slate-300 hover:border-cyan-400')}`;
-
-                    const cardCanvas = document.createElement('canvas');
-                    renderCardOnCanvas(cardCanvas, card, gameState.easyMode, 140, 200);
-                    cardWrapper.appendChild(cardCanvas);
-
-                    cardWrapper.onclick = () => {
-                        if (isMyTurn && gameState.hasRolledThisTurn) {
-                            playCard(cIdx);
-                        } else if (!gameState.hasRolledThisTurn) {
-                            showToast("Roll the die first before playing a card!");
-                        }
-                    };
-
-                    handGrid.appendChild(cardWrapper);
-                });
-
-                const tip = document.getElementById('handStatusTip');
-                if (isMyTurn && gameState.hasRolledThisTurn) {
-                    tip.innerText = playableCount > 0 ? `✨ ${playableCount} matching card(s) available!` : `No valid matches. Click 'Draw Card / End Turn'`;
-                } else {
-                    tip.innerText = '';
-                }
-            }
-
-            // Update Log Display
-            const latestLog = document.getElementById('latestLogText');
-            if (gameState.logs.length > 0) {
-                latestLog.innerText = gameState.logs[gameState.logs.length - 1];
-            }
-        }
-
-        function getRollRuleName(roll) {
-            const rules = {
-                1: "No Luck!",
-                2: "Parallel Lines (Same m)",
-                3: "Perpendicular Lines (m1 × m2 = -1)",
-                4: "Same y-intercept (c)",
-                5: "Same x-intercept",
-                6: "Drop Any Card!"
-            };
-            return rules[roll] || "";
-        }
-
-        function logAction(msg) {
-            gameState.logs.push(msg);
-            const fullList = document.getElementById('fullLogList');
-            if (fullList) {
-                const entry = document.createElement('div');
-                entry.className = "pb-1 border-b border-slate-800/60";
-                entry.innerText = `> ${msg}`;
-                fullList.appendChild(entry);
-                fullList.scrollTop = fullList.scrollHeight;
-            }
-            updateUI();
-        }
-
-        // --- USER ACTION INTERFACES ---
-        function userRollDice() {
-            if (isLocalPlayerTurn() && !gameState.hasRolledThisTurn) {
-                const diceCube = document.getElementById('diceCube');
-                diceCube.classList.add('dice-rolling');
-                setTimeout(() => diceCube.classList.remove('dice-rolling'), 600);
-                rollDice();
-            }
-        }
-
-        function userDrawCard() {
-            if (isLocalPlayerTurn() && gameState.hasRolledThisTurn) {
-                drawCard();
-            }
-        }
-
-        // --- SETUP SCREEN & NAVIGATION ---
-        function switchSetupTab(tab) {
-            gameConfig.mode = tab;
-            ['Solo', 'Host', 'Join'].forEach(t => {
-                const btn = document.getElementById('tab' + t);
-                const panel = document.getElementById('panel' + t);
-                if (t.toLowerCase() === tab) {
-                    btn.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 bg-indigo-600 text-white shadow";
-                    panel.classList.remove('hidden');
-                } else {
-                    btn.className = "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white";
-                    panel.classList.add('hidden');
-                }
-            });
-            document.getElementById('lobbyView').classList.add('hidden');
-        }
-
-        function setBotCount(count) {
-            gameConfig.botCount = count;
-            [1, 2, 3].forEach(c => {
-                const btn = document.getElementById('botBtn' + c);
-                if (c === count) {
-                    btn.className = "bot-count-btn py-3 rounded-xl border border-indigo-600 bg-indigo-950/60 text-white font-semibold text-sm transition";
-                } else {
-                    btn.className = "bot-count-btn py-3 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-sm transition";
-                }
-            });
-        }
-
-        function setDeckMode(isEasy) {
-            gameConfig.easyMode = isEasy;
-            ['deckEasyBtn', 'hostDeckEasyBtn'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.className = isEasy ? "deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-emerald-500/80 bg-emerald-950/30 text-white transition" : "deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 transition";
-            });
-            ['deckStandardBtn', 'hostDeckStandardBtn'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.className = !isEasy ? "deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-emerald-500/80 bg-emerald-950/30 text-white transition" : "deck-mode-btn cursor-pointer p-3.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-400 transition";
-            });
-        }
-
-        function startSoloGame() {
-            const name = document.getElementById('soloPlayerName').value.trim() || "Player 1";
-            const players = [{ id: gameConfig.localPlayerId, name: name, isBot: false }];
-
-            for (let i = 1; i <= gameConfig.botCount; i++) {
-                players.push({
-                    id: 'bot_' + i,
-                    name: `AI Bot ${i}`,
-                    isBot: true
-                });
-            }
-
-            document.getElementById('setupScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
-
-            initGame(players, gameConfig.easyMode);
-        }
-
-        // --- MULTIPLAYER P2P & BROADCASTCHANNEL ENGINE ---
-        function createHostRoom() {
-            const hostName = document.getElementById('hostPlayerName').value.trim() || "Host Player";
-            gameConfig.roomCode = Math.floor(1000 + Math.random() * 9000).toString();
-
-            setupNetworking(gameConfig.roomCode);
-
-            const players = [{ id: gameConfig.localPlayerId, name: hostName, isBot: false }];
-            gameState.players = players;
-
-            showLobbyView();
-        }
-
-        function joinRoom() {
-            const guestName = document.getElementById('joinPlayerName').value.trim() || "Guest";
-            const code = document.getElementById('joinRoomCode').value.trim();
-
-            if (code.length !== 4) {
-                showToast("Please enter a valid 4-digit room code!");
-                return;
-            }
-
-            gameConfig.roomCode = code;
-            setupNetworking(code);
-
-            // Announce join
-            broadcastMsg({ type: 'PLAYER_JOIN', player: { id: gameConfig.localPlayerId, name: guestName, isBot: false } });
-
-            showLobbyView(false);
-        }
-
-        function showLobbyView(isHost = true) {
-            ['panelSolo', 'panelHost', 'panelJoin'].forEach(p => document.getElementById(p).classList.add('hidden'));
-            const lobby = document.getElementById('lobbyView');
-            lobby.classList.remove('hidden');
-
-            document.getElementById('lobbyRoomCode').innerText = gameConfig.roomCode;
-            document.getElementById('hostLobbyControls').style.display = isHost ? 'block' : 'none';
-            document.getElementById('addAiBtn').style.display = isHost ? 'block' : 'none';
-            document.getElementById('clientLobbyWait').style.display = isHost ? 'none' : 'block';
-
-            updateLobbyPlayerList();
-        }
-
-        function addAiBotToLobby() {
-            if (gameState.players.length >= 6) {
-                showToast("Maximum 6 players reached!");
-                return;
-            }
-            const botNum = gameState.players.filter(p => p.isBot).length + 1;
-            gameState.players.push({
-                id: 'bot_' + Date.now() + '_' + botNum,
-                name: `AI Bot ${botNum}`,
-                isBot: true
-            });
-            updateLobbyPlayerList();
-            broadcastMsg({ type: 'LOBBY_UPDATE', players: gameState.players });
-        }
-
-        function updateLobbyPlayerList() {
-            const list = document.getElementById('lobbyPlayerList');
-            document.getElementById('playerCount').innerText = gameState.players.length;
-            list.innerHTML = '';
-
-            gameState.players.forEach(p => {
-                const item = document.createElement('div');
-                item.className = "flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm";
-                item.innerHTML = `
-                    <div class="flex items-center space-x-3">
-                        <div class="w-8 h-8 rounded-full ${p.isBot ? 'bg-indigo-600' : 'bg-cyan-600'} flex items-center justify-center font-bold text-white text-xs">
-                            ${p.isBot ? '<i class="fa-solid fa-robot"></i>' : p.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <span class="font-semibold text-white">${p.name} ${p.id === gameConfig.localPlayerId ? '(You)' : ''}</span>
-                    </div>
-                    <span class="text-xs ${p.isBot ? 'text-indigo-400' : 'text-emerald-400'} font-medium">${p.isBot ? 'Bot' : 'Ready'}</span>
-                `;
-                list.appendChild(item);
-            });
-        }
-
-        function startMultiplayerGame() {
-            if (gameState.players.length < 2) {
-                showToast("Need at least 2 players to start!");
-                return;
-            }
-            broadcastMsg({ type: 'START_MATCH', easyMode: gameConfig.easyMode, players: gameState.players });
-            document.getElementById('setupScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
-            initGame(gameState.players, gameConfig.easyMode);
-        }
-
-        function setupNetworking(code) {
-            // BroadcastChannel for local multi-tab sync
-            if ('BroadcastChannel' in window) {
-                broadcastChan = new BroadcastChannel(`riserun_${code}`);
-                broadcastChan.onmessage = (event) => handleNetworkMessage(event.data);
-            }
-
-            // PeerJS for cross-device WebRTC
-            try {
-                peerInstance = new Peer(`riserun-${code}-${gameConfig.localPlayerId}`, { debug: 1 });
-                peerInstance.on('connection', (conn) => {
-                    peerConnections.push(conn);
-                    conn.on('data', (data) => handleNetworkMessage(data));
-                });
-            } catch (e) {
-                console.log("PeerJS fallback mode enabled.");
-            }
-        }
-
-        function broadcastMsg(msg) {
-            if (broadcastChan) broadcastChan.postMessage(msg);
-            peerConnections.forEach(conn => {
-                if (conn.open) conn.send(msg);
-            });
-        }
-
-        function handleNetworkMessage(msg) {
-            if (msg.type === 'PLAYER_JOIN') {
-                if (!gameState.players.some(p => p.id === msg.player.id)) {
-                    gameState.players.push(msg.player);
-                    updateLobbyPlayerList();
-                    broadcastMsg({ type: 'LOBBY_UPDATE', players: gameState.players });
-                }
-            } else if (msg.type === 'LOBBY_UPDATE') {
-                gameState.players = msg.players;
-                updateLobbyPlayerList();
-            } else if (msg.type === 'START_MATCH') {
-                gameConfig.easyMode = msg.easyMode;
-                document.getElementById('setupScreen').classList.add('hidden');
-                document.getElementById('gameScreen').classList.remove('hidden');
-                initGame(msg.players, msg.easyMode);
-            }
-        }
-
-        // --- HELPER UTILITIES ---
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-
-        function copyShareLink() {
-            const url = `${window.location.origin}${window.location.pathname}?room=${gameConfig.roomCode}`;
-            const dummy = document.createElement('input');
-            document.body.appendChild(dummy);
-            dummy.value = url;
-            dummy.select();
-            document.execCommand('copy');
-            document.body.removeChild(dummy);
-            showToast("Direct share link copied to clipboard!");
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
-            }, 3000);
-        }
-
-        function toggleModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) modal.classList.toggle('hidden');
-        }
-
-        function showWinnerModal(winnerName) {
-            document.getElementById('winnerText').innerText = `${winnerName} wins the game!`;
-            document.getElementById('winnerModal').classList.remove('hidden');
-        }
-
-        function resetToSetup() {
-            document.getElementById('winnerModal').classList.add('hidden');
-            document.getElementById('gameScreen').classList.add('hidden');
-            document.getElementById('setupScreen').classList.remove('hidden');
-            switchSetupTab('solo');
-        }
-
-        // --- DIRECT LINK / URL PARAM DETECTOR ---
-        window.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const roomParam = params.get('room');
-            if (roomParam && roomParam.length === 4) {
-                switchSetupTab('join');
-                document.getElementById('joinRoomCode').value = roomParam;
-                showToast(`Joined room code ${roomParam} from direct link!`);
-            }
-        });
-    </script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rise &amp; Run</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--ink:#1c2733;--blue:#1f6fd1;--orange:#e8820c;--red:#c0392b;--felt:#e6ece8;--navy:#1b2f4a;--cw:clamp(84px,21vw,118px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--felt);color:var(--ink);font:16px/1.45 Georgia,"Times New Roman",serif}
+#app{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:2.4rem;margin:.2em 0 0;letter-spacing:-.5px}
+h1 i{color:var(--blue)}
+.sub{margin:0 0 1em;color:#4b5a69}
+.panel{background:#fff;border:1.5px solid #9aa5a0;border-radius:10px;padding:14px 16px;margin:12px 0}
+label{display:block;margin:8px 0}
+input[type=text],select{font:inherit;padding:6px 8px;border:1.5px solid #9aa5a0;border-radius:6px;background:#fff}
+button{font:inherit;cursor:pointer;padding:9px 16px;border:1.5px solid var(--navy);border-radius:8px;background:var(--navy);color:#fff}
+button.alt{background:#fff;color:var(--navy)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.code{font-size:2.6rem;letter-spacing:.3em;font-weight:bold}
+.warn{color:var(--red);font-weight:bold}
+a{color:var(--blue)}
+.card{width:var(--cw);aspect-ratio:5/7;background:#fff;border:1.5px solid #8a8a8a;border-radius:8px;padding:5px;display:flex;flex-direction:column;align-items:center;font-family:Helvetica,Arial,sans-serif;flex:none;user-select:none}
+.card b{font-size:calc(var(--cw)*.13);margin:2px 0}
+.card svg{width:100%;flex:1;min-height:0}
+.ie{display:flex;flex-direction:column;font-size:calc(var(--cw)*.09);font-weight:bold;line-height:1.2;align-self:flex-start;padding-left:4px}
+.ie .b{color:var(--blue)}.ie .o{color:var(--orange)}
+.card.back{background:var(--navy);color:#fff;justify-content:center;border:4px solid #fff;outline:1.5px solid #8a8a8a;font-family:Georgia,serif;text-align:center;font-size:calc(var(--cw)*.17);font-style:italic}
+.card.back small{font:bold calc(var(--cw)*.09) Helvetica,sans-serif;color:var(--orange);margin-top:6px;font-style:normal}
+.hand{display:flex;gap:8px;overflow-x:auto;padding:16px 4px 8px;min-height:calc(var(--cw)*1.4+30px)}
+.hand .card{cursor:pointer;transition:transform .12s}
+.hand .card.hint{box-shadow:0 0 0 3px #2e9e5b}
+.hand .card.sel{transform:translateY(-14px);border-color:var(--blue);box-shadow:0 0 0 3px var(--blue)}
+.order{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:4px 10px;border:1.5px solid #9aa5a0;border-radius:20px;background:#fff;font-size:.9rem}
+.chip.turn{background:var(--navy);color:#fff;border-color:var(--navy)}
+.table{display:flex;gap:22px;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin:14px 0}
+.table figure{margin:0;text-align:center;font-size:.85rem}
+.table .card.small{width:calc(var(--cw)*.6)}
+#die{background:none;border:none;width:112px;height:112px;padding:0;border-radius:20px;cursor:pointer}
+#die:disabled{opacity:1;cursor:default}
+.scene{perspective:380px;width:112px;height:112px;display:flex;align-items:center;justify-content:center}
+.tilt{transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(-22deg)}
+.cube{--h:40px;width:80px;height:80px;position:relative;transform-style:preserve-3d;transform:rotateX(var(--x)) rotateY(var(--y))}
+.cube.roll{animation:tumble .95s cubic-bezier(.2,.7,.3,1)}
+@keyframes tumble{from{transform:rotateX(calc(var(--x) + 900deg)) rotateY(calc(var(--y) + 1260deg)) rotateZ(240deg)}to{transform:rotateX(var(--x)) rotateY(var(--y)) rotateZ(0)}}
+.face{position:absolute;inset:0;background:#fff;border:2px solid var(--navy);border-radius:12px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:10px;backface-visibility:hidden}
+.face i{background:var(--navy);border-radius:50%;margin:12%}
+#die.go,.pile.go{animation:pulse 1s infinite}
+.pile{border-radius:10px;display:inline-block}
+.pile.go{cursor:pointer}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(31,111,209,.35)}}
+.rule{background:#fff;border:1.5px solid var(--blue);border-radius:8px;padding:6px 12px;margin:0 auto 8px;max-width:560px}
+.msg{text-align:center;min-height:3.2em}
+.bar{height:8px;background:#ccd3d0;border-radius:4px;overflow:hidden;margin:6px auto;max-width:320px}
+.bar i{display:block;height:100%;background:var(--orange);width:100%;animation:drain linear forwards}
+@keyframes drain{to{width:0}}
+@media (prefers-reduced-motion:reduce){#die.go,.pile.go,.cube.roll{animation:none}}
+</style></head><body><div id="app"></div>
+<script>
+// ---------- cards ----------
+const C=[];[1,-1,.5,-.5,2,-2].forEach(m=>C.push({m,c:0}));C.push({m:0,c:0},{v:0});
+[3,-3,6,-6,12,-12].forEach(k=>C.push({m:0,c:k},{v:k}));
+[[3,[1,-1,.5,-.5]],[6,[2,-2,1,-1,.5,-.5]],[12,[2,-2]]].forEach(([k,ms])=>ms.forEach(m=>C.push({m,c:k},{m,c:-k})));
+const f=n=>String(n).replace('-','−');
+const iv=n=>n==null?'none':n==='any'?'any':f(n);
+const eq=c=>c.v!==undefined?'x = '+f(c.v):c.m===0?'y = '+f(c.c):'y = '+(c.m===1?'':c.m===-1?'−':f(c.m))+'x'+(c.c?(c.c>0?' + ':' − ')+Math.abs(c.c):'');
+const yi=c=>c.v!==undefined?(c.v===0?'any':null):c.c;
+const xi=c=>c.v!==undefined?c.v:(c.m===0?(c.c===0?'any':null):(-c.c/c.m)+0);
+const sl=c=>c.v!==undefined?Infinity:c.m;
+const same=(a,b)=>a!==null&&b!==null&&(a==='any'||b==='any'||a===b);
+function match(r,a,b){a=C[a];b=C[b];const s=sl(a),t=sl(b);
+ if(r===2)return s===t;
+ if(r===3)return (s===Infinity&&t===0)||(s===0&&t===Infinity)||s*t===-1;
+ if(r===4)return same(yi(a),yi(b));
+ if(r===5)return same(xi(a),xi(b));
+ return true}
+const REQ={1:["Draw!","The player takes a card from the draw pile. Their turn is then over."],2:["Parallel.","Play a line parallel to the top card (they never meet)."],3:["Perpendicular.","Play a line that crosses the top card at a right angle."],4:["Same y-intercept.","Play a line that crosses the y-axis at the same point as the top card."],5:["Same x-intercept.","Play a line that crosses the x-axis at the same point as the top card."],6:["Discard!","Choose any card from your hand and put it on the discard pile."]};
+const PIPS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+const FACE={1:[0,0],2:[0,-90],3:[-90,0],4:[90,0],5:[0,90],6:[0,180]};
+const FN=[[1,''],[6,'rotateY(180deg) '],[2,'rotateY(90deg) '],[5,'rotateY(-90deg) '],[3,'rotateX(90deg) '],[4,'rotateX(-90deg) ']];
+const dieH=(n,anim)=>{const [x,y]=FACE[n||3];return `<div class="scene"><div class="tilt"><div class="cube${anim?' roll':''}" style="--x:${x}deg;--y:${y}deg">${FN.map(([k,t])=>`<div class="face" style="transform:${t}translateZ(40px)">${[0,1,2,3,4,5,6,7,8].map(i=>PIPS[k].includes(i)?'<i></i>':'<b></b>').join('')}</div>`).join('')}</div></div></div>`};
+function gfx(c,easy){const X=v=>50+v*3.4,Y=v=>50-v*3.4;let s='<svg viewBox="0 0 100 100">';
+ for(let i=-12;i<=12;i+=3){s+=`<path d="M${X(i)} ${Y(-12)}V${Y(12)}M${X(-12)} ${Y(i)}H${X(12)}" stroke="#ddd" stroke-width=".4"/>`;
+  if(i)s+=`<text x="${X(i)}" y="${Y(0)+4.2}" font-size="3.2" text-anchor="middle" fill="#666">${f(i)}</text><text x="${X(0)-1.2}" y="${Y(i)+1.1}" font-size="3.2" text-anchor="end" fill="#666">${f(i)}</text>`}
+ s+=`<path d="M${X(-12)} ${Y(0)}H${X(12)}M${X(0)} ${Y(-12)}V${Y(12)}" stroke="#333" stroke-width=".8"/><text x="95" y="${Y(0)+1.2}" font-size="4" fill="#333">x</text><text x="${X(0)+2}" y="6" font-size="4" fill="#333">y</text>`;
+ let a,b;if(c.v!==undefined){a=[c.v,-12];b=[c.v,12]}else{let lo=-12,hi=12;if(c.m){const p=(-12-c.c)/c.m,q=(12-c.c)/c.m;lo=Math.max(lo,Math.min(p,q));hi=Math.min(hi,Math.max(p,q))}a=[lo,c.m*lo+c.c];b=[hi,c.m*hi+c.c]}
+ s+=`<path d="M${X(a[0])} ${Y(a[1])}L${X(b[0])} ${Y(b[1])}" stroke="#c0392b" stroke-width="1.4" stroke-linecap="round"/>`;
+ if(easy){const x=xi(c),y=yi(c);if(typeof x==='number')s+=`<circle cx="${X(x)}" cy="${Y(0)}" r="2.6" fill="#e8820c"/>`;if(typeof y==='number')s+=`<circle cx="${X(0)}" cy="${Y(y)}" r="${x===0?1.6:2.6}" fill="#1f6fd1"/>`}
+ return s+'</svg>'}
+const cardH=(id,easy,cls='')=>{const c=C[id];return `<div class="card ${cls}" data-c="${id}"><b>${eq(c)}</b>${gfx(c,easy)}${easy?`<div class="ie"><span class="b">y-int: ${iv(yi(c))}</span><span class="o">x-int: ${iv(xi(c))}</span></div>`:''}</div>`};
+const back=easy=>`<div class="card back">Rise &amp; Run${easy?'<small>EASY MODE</small>':''}</div>`;
+const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const $=s=>document.querySelector(s),app=$('#app');
+
+// ---------- host-side game engine ----------
+let G=null,hostPid=0,isHost=false,peer=null,conn=null,lob=[],cfg={},hcode='',V=null,sel=null,key='',lastRn=0,rolling=false,hint=false;
+function newGame(list){const d=shuf(C.map((_,i)=>i)),pl=shuf(list.slice());
+ pl.forEach((p,i)=>{p.id=i;p.hand=d.splice(0,5);if(p.host)hostPid=i});
+ G={players:pl,draw:d,disc:[d.pop()],turn:0,phase:'roll',die:null,pend:null,winner:null,rn:0,seq:0,timer:null,easy:cfg.easy,chal:cfg.chal,delay:cfg.delay,
+  msg:'Players are in random order. '+pl[0].name+' goes first.'};push()}
+const topC=()=>G.disc[G.disc.length-1];
+const okc=c=>G.die===6||match(G.die,c,topC());
+function draw(P){if(!G.draw.length){const t=G.disc.pop();G.draw=shuf(G.disc);G.disc=[t]}if(G.draw.length)P.hand.push(G.draw.pop())}
+function end(){if(G.players[G.turn].hand.length===0){G.winner=G.turn;G.phase='over';return}G.turn=(G.turn+1)%G.players.length;G.phase='roll'}
+function act(pid,a){if(!G||G.winner!==null)return;const P=G.players[pid];if(!P)return;
+ if(a.t==='roll'&&G.turn===pid&&G.phase==='roll'){G.die=1+Math.random()*6|0;G.rn++;G.msg='';G.phase=G.die===1?'draw':'play'}
+ else if(a.t==='draw'&&G.turn===pid&&G.phase==='draw'){draw(P);G.msg=P.name+' rolled a 1 and drew a card.';end()}
+ else if(a.t==='pass'&&G.turn===pid&&G.phase==='play'&&G.die<6){G.msg=P.name+' has no match and ends the turn.';end()}
+ else if(a.t==='play'&&G.turn===pid&&G.phase==='play'&&P.hand.includes(a.c)){
+  const prev=topC(),good=okc(a.c);if(!good&&!G.chal)return;
+  P.hand.splice(P.hand.indexOf(a.c),1);G.disc.push(a.c);
+  if(G.chal&&G.die<6){G.phase='chal';G.pend={p:pid,card:a.c,prev,die:G.die,good,end:Date.now()+G.delay*1000};G.msg=P.name+' played a card. Does it match? Challenge it!';
+   G.timer={ms:G.delay*1000,fn:()=>{G.pend=null;G.msg='';end()}}}
+  else{G.msg=P.name+(G.die===6?' discarded a card.':' played a card.');end()}}
+ else if(a.t==='chal'&&G.phase==='chal'&&pid!==G.pend.p){const pp=G.players[G.pend.p];
+  if(!G.pend.good){G.disc.pop();pp.hand.push(G.pend.card);draw(pp);G.msg=P.name+' challenged and was right! '+pp.name+' takes the card back and draws one.'}
+  else{draw(P);G.msg=P.name+' challenged, but the card matched. '+P.name+' draws a card.'}
+  G.pend=null;G.timer=null;end()}
+ else return;
+ push()}
+function view(pid){return{you:pid,pl:G.players.map(p=>({n:p.name,k:p.hand.length,bot:p.bot})),hand:G.players[pid].hand,top:topC(),dn:G.disc.length,drn:G.draw.length,turn:G.turn,phase:G.phase,die:G.die,rn:G.rn,msg:G.msg,winner:G.winner,easy:G.easy,chal:G.chal,
+ pend:G.pend&&{p:G.pend.p,prev:G.pend.prev,rem:Math.max(0,G.pend.end-Date.now())}}}
+function push(){G.seq++;const s=G.seq,T=G.timer;G.timer=null;
+ if(T)setTimeout(()=>{if(G.seq===s){T.fn();push()}},T.ms);
+ G.players.forEach(p=>{if(p.conn&&p.conn.open)p.conn.send({t:'v',v:view(p.id)})});
+ show(view(hostPid));bots(s)}
+function bots(s){if(G.winner!==null)return;const t=G.players[G.turn],go=(ms,fn)=>setTimeout(()=>{if(G.seq===s)fn()},ms);
+ if(t.bot&&G.phase==='roll')go(1800,()=>act(G.turn,{t:'roll'}));
+ if(t.bot&&G.phase==='draw')go(2400,()=>act(G.turn,{t:'draw'}));
+ if(t.bot&&G.phase==='play')go(1400,()=>{const c=G.die===6?t.hand[Math.random()*t.hand.length|0]:t.hand.find(okc);c!==undefined?act(G.turn,{t:'play',c}):act(G.turn,{t:'pass'})});
+ if(G.phase==='chal'&&!G.pend.good)G.players.forEach(p=>{if(p.bot&&p.id!==G.pend.p&&Math.random()<.8)go(700+Math.random()*Math.max(0,G.delay*1000-1500),()=>act(p.id,{t:'chal'}))})}
+const send=a=>isHost?act(hostPid,a):conn&&conn.send(a);
+
+// ---------- screens ----------
+function setup(){app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><p class="sub">A card game about straight lines. 2–6 players.</p>
+<div class="panel"><label>Your name <input type="text" id="nm" maxlength="16" value="Player"></label>
+<label><input type="radio" name="dk" value="std" checked> Standard deck (read the intercepts off the graph)</label>
+<label><input type="radio" name="dk" value="easy"> Easy mode deck (intercepts shown on each card)</label>
+<label><input type="checkbox" id="ch"> Challenge mode: any card can be played, but others may challenge it</label>
+<label>Time to challenge <select id="dl"><option>3</option><option selected>5</option><option>8</option><option>12</option></select> seconds</label>
+<label>Computer players <select id="bt"><option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option></select></label>
+<div class="row"><button id="solo">Play against the computer</button><button class="alt" id="host">Host a game for friends</button></div></div>
+<div class="panel"><b>Join a friend’s game</b><div class="row"><input type="text" id="jc" maxlength="4" size="6" placeholder="4-digit code" inputmode="numeric"><button class="alt" id="jn">Join</button></div></div>
+<div class="panel"><b>Make your own physical game</b><div class="row"><a href="rise_and_run_rules.pdf" download>Rules (PDF)</a><a href="rise_and_run_cards.pdf" download>Standard cards (PDF)</a><a href="rise_and_run_cards_easy_mode.pdf" download>Easy mode cards (PDF)</a></div></div>`;
+ const rd=()=>({name:$('#nm').value.trim()||'Player',easy:document.querySelector('[name=dk]:checked').value==='easy',chal:$('#ch').checked,delay:+$('#dl').value,bots:+$('#bt').value});
+ $('#solo').onclick=()=>{cfg=rd();isHost=true;const n=Math.max(1,Math.min(5,cfg.bots));newGame([{name:cfg.name,host:true},...Array.from({length:n},(_,i)=>({name:'Computer '+(i+1),bot:true}))])};
+ $('#host').onclick=()=>{cfg=rd();hostGame()};
+ $('#jn').onclick=()=>/^\d{4}$/.test($('#jc').value)?joinGame($('#jc').value,rd().name):alert('Enter the 4-digit code.')}
+function joinScreen(code){app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><div class="panel"><b>Join game ${code}</b><label>Your name <input type="text" id="nm" maxlength="16" value="Player"></label><button id="jn">Join game</button></div>`;
+ $('#jn').onclick=()=>joinGame(code,$('#nm').value.trim()||'Player')}
+function lobbyUI(){const link=location.href.split('#')[0]+'#join='+hcode,names=[cfg.name,...lob.map(c=>c.pname)];
+ app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><div class="panel"><p>Share this code or link:</p><div class="code">${hcode}</div><p><a href="${link}">${link}</a></p><button class="alt" id="cp">Copy link</button></div>
+ <div class="panel"><b>Players</b><ul>${names.map(n=>`<li>${esc(n)}</li>`).join('')}${cfg.bots?`<li>+ ${cfg.bots} computer player${cfg.bots>1?'s':''}</li>`:''}</ul><button id="go" ${names.length+cfg.bots<2?'disabled':''}>Start game</button></div>`;
+ $('#cp').onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(link);
+ $('#go').onclick=()=>newGame([{name:cfg.name,host:true},...lob.map(c=>({name:c.pname,conn:c})),...Array.from({length:cfg.bots},(_,i)=>({name:'Computer '+(i+1),bot:true}))])}
+const bcast=()=>lob.forEach(c=>c.send({t:'lobby',names:[cfg.name,...lob.map(x=>x.pname)]}));
+function hostGame(){isHost=true;lob=[];const code=String(1000+Math.random()*9000|0);if(peer)peer.destroy();peer=new Peer('riserun-'+code);
+ peer.on('error',e=>e.type==='unavailable-id'?hostGame():alert('Connection problem: '+e.type));
+ peer.on('open',()=>{hcode=code;lobbyUI()});
+ peer.on('connection',cn=>{
+  cn.on('data',d=>{if(!G){if(d.t==='hello'&&lob.length+1+cfg.bots<6){cn.pname=String(d.name||'Player').slice(0,16);lob.push(cn);lobbyUI();bcast()}}
+   else{const p=G.players.find(p=>p.conn===cn);if(p)act(p.id,d)}});
+  cn.on('close',()=>{if(!G){lob=lob.filter(x=>x!==cn);lobbyUI();bcast()}else{const p=G.players.find(p=>p.conn===cn);if(p){p.bot=true;p.conn=null;push()}}})})}
+function joinGame(code,name){isHost=false;app.innerHTML='<p>Connecting…</p>';peer=new Peer();
+ peer.on('error',e=>{alert('Could not join: '+e.type);location.hash='';location.reload()});
+ peer.on('open',()=>{conn=peer.connect('riserun-'+code,{reliable:true});
+  conn.on('open',()=>{conn.send({t:'hello',name});app.innerHTML='<p>Connected. Waiting for the host to start…</p>'});
+  conn.on('data',d=>{if(d.t==='lobby')app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><div class="panel"><b>Waiting for the host to start</b><ul>${d.names.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`;if(d.t==='v')show(d.v)});
+  conn.on('close',()=>app.insertAdjacentHTML('afterbegin','<p class="warn">Disconnected from the host.</p>'));
+  setTimeout(()=>{if(!conn.open){alert('Game not found. Check the code.');location.hash='';location.reload()}},9000)})}
+
+// ---------- game screen ----------
+function show(v){V=v;const my=v.turn===v.you,ph=v.phase,k=v.turn+ph;
+ if(k!==key){sel=null;hint=false;key=k}if(!v.hand.includes(sel))sel=null;
+ const fresh=v.rn&&v.rn!==lastRn;if(fresh){lastRn=v.rn;rolling=true;setTimeout(()=>{rolling=false;show(V)},1000)}
+ const nm=i=>esc(v.pl[i].n),R=REQ[v.die]||['',''],canPlay=my&&ph==='play'&&!rolling,canDraw=my&&ph==='draw'&&!rolling;
+ const fits=c=>v.die===6||match(v.die,c,v.top),bad=canPlay&&sel!==null&&!fits(sel);
+ let say='';
+ if(ph==='over')say=`<b>${nm(v.winner)} wins!</b>`;
+ else if(ph==='roll')say=my?'Your turn. Click the die to roll.':`Waiting for ${nm(v.turn)} to roll…`;
+ else if(canPlay){say=sel===null?(v.die===6?'Choose a card to discard.':'Choose a card that fits. Click a card to check it.'):v.die===6?'Click the card again to discard it.':bad?`<span class="warn">This card doesn’t match. ${v.chal?'You can still play it by clicking it again, but others may challenge you.':'Choose a different card.'}</span>`:'✓ This card matches. Click it again to play it.';
+  if(hint&&v.die<6)say+='<br>'+(v.hand.some(fits)?'Matching cards are outlined in green.':'None of your cards match. End your turn.')}
+ else if(canDraw)say='Click the draw pile to take a card.';
+ else if(!rolling&&(ph==='play'||ph==='draw'))say=`${nm(v.turn)} is thinking…`;
+ const rule=v.die&&['play','draw','chal'].includes(ph)&&!rolling?`<div class="rule"><b>Rolled ${v.die}: ${R[0]}</b> ${R[1]}</div>`:'';
+ let h=`<div class="order">${v.pl.map((p,i)=>`<span class="chip ${i===v.turn&&ph!=='over'?'turn':''}">${esc(p.n)}${i===v.you?' (you)':''}${p.bot?' 🤖':''}: ${p.k}</span>`).join('')}</div>
+ <div class="table"><figure><div id="pile" class="pile ${canDraw?'go':''}">${back(v.easy)}</div><br>Draw pile: ${v.drn}${canDraw?'<br><b>Click to draw</b>':''}</figure>
+ <figure>${cardH(v.top,v.easy)}Top of discard pile (${v.dn})</figure>
+ ${v.pend?`<figure>${cardH(v.pend.prev,v.easy,'small')}It was played on this</figure>`:''}
+ <figure><button id="die" class="${my&&ph==='roll'?'go':''}" ${my&&ph==='roll'?'':'disabled'} aria-label="Roll the die">${dieH(v.die,fresh)}</button></figure></div>
+ <div class="msg">${rule}${v.msg?esc(v.msg)+'<br>':''}${say}</div>`;
+ if(ph==='chal'){h+=`<div class="bar"><i style="animation-duration:${v.pend.rem}ms"></i></div>`;if(v.pend.p!==v.you)h+=`<div class="row" style="justify-content:center"><button id="ch" style="background:var(--red);border-color:var(--red)">Challenge!</button></div>`}
+ if(canPlay&&v.die<6)h+=`<div class="row" style="justify-content:center"><button class="alt" id="hn">Show me a match</button><button class="alt" id="ps">No match: end my turn</button></div>`;
+ if(ph==='over')h+=`<div class="row" style="justify-content:center"><button id="again">Back to menu</button></div>`;
+ h+=`<div class="hand">${v.hand.map(c=>cardH(c,v.easy,(c===sel?'sel ':'')+(hint&&canPlay&&v.die<6&&fits(c)?'hint':''))).join('')}</div>`;
+ app.innerHTML=h;
+ const g=id=>document.getElementById(id);
+ if(g('die'))g('die').onclick=()=>send({t:'roll'});
+ if(canDraw)g('pile').onclick=()=>send({t:'draw'});
+ if(g('hn'))g('hn').onclick=()=>{hint=true;show(V)};
+ if(g('ps'))g('ps').onclick=()=>send({t:'pass'});
+ if(g('ch'))g('ch').onclick=()=>send({t:'chal'});
+ if(g('again'))g('again').onclick=()=>{location.hash='';location.reload()};
+ app.querySelectorAll('.hand .card').forEach(el=>el.onclick=()=>{if(!canPlay)return;const c=+el.dataset.c;if(sel===c){if(!bad||v.chal)send({t:'play',c});return}sel=c;show(V)})}
+
+const m=location.hash.match(/join=(\d{4})/);m?joinScreen(m[1]):setup();
+</script></body></html>
