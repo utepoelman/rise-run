@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rise &amp; Run</title>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#1c2733;--blue:#1f6fd1;--orange:#e8820c;--red:#c0392b;--felt:#e6ece8;--navy:#1b2f4a;--cw:clamp(84px,21vw,118px)}
 *{box-sizing:border-box}
@@ -22,7 +23,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .warn{color:var(--red);font-weight:bold}
 a{color:var(--blue)}
 .card{width:var(--cw);aspect-ratio:5/7;background:#fff;border:1.5px solid #8a8a8a;border-radius:8px;padding:5px;display:flex;flex-direction:column;align-items:center;font-family:Helvetica,Arial,sans-serif;flex:none;user-select:none}
-.card b{font-size:calc(var(--cw)*.13);margin:2px 0}
+.card b{white-space:nowrap;font-size:calc(var(--cw)*.13);margin:2px 0}
 .card svg{width:100%;flex:1;min-height:0}
 .ie{display:flex;flex-direction:column;font-size:calc(var(--cw)*.09);font-weight:bold;line-height:1.2;align-self:flex-start;padding-left:4px}
 .ie .b{color:var(--blue)}.ie .o{color:var(--orange)}
@@ -57,6 +58,49 @@ a{color:var(--blue)}
 .bar i{display:block;height:100%;background:var(--orange);width:100%;animation:drain linear forwards}
 @keyframes drain{to{width:0}}
 @media (prefers-reduced-motion:reduce){#die.go,.pile.go,.cube.roll{animation:none}}
+</style>
+<style>
+[hidden]{display:none!important}
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;color:#1c2733;min-height:100vh;background:linear-gradient(#f6f3ec,#e8e3d6) fixed}
+h1{font-family:Fraunces,"Playfair Display",Georgia,serif;font-weight:600;font-size:2.6rem;letter-spacing:.01em;color:#1b2f4a}
+h1 i{color:#b8902f;font-weight:400}
+.sub{color:#5b6773;letter-spacing:.04em}
+.panel{background:#fff;color:#1c2733;border:1px solid #e0dacb;border-radius:16px;box-shadow:0 6px 20px rgba(27,47,74,.1);padding:18px 22px}
+input[type=text],select{border:1px solid #c9c2b0;border-radius:8px;padding:7px 10px;background:#fff;color:#1c2733}
+.codein{width:10.5em;text-align:center}
+.codein:not(:placeholder-shown){letter-spacing:.3em;font-weight:600}
+input:focus,select:focus,button:focus-visible{outline:2px solid #b8902f;outline-offset:2px}
+input[type=radio],input[type=checkbox]{accent-color:#1b2f4a}
+button{background:#1b2f4a;color:#fff;border:1.5px solid #1b2f4a;border-radius:999px;padding:10px 22px;font-weight:600;letter-spacing:.02em;transition:filter .15s,transform .15s}
+button:hover:not(:disabled){filter:brightness(1.25);transform:translateY(-1px)}
+button.alt{background:#fff;color:#1b2f4a;border:1.5px solid #1b2f4a}
+.panel a,a{color:#1b4f9c}
+.warn{color:#b3261e}
+.card{color:#111;border:1px solid #b5b0a4;box-shadow:0 3px 10px rgba(27,47,74,.2)}
+.card b{font-size:calc(var(--cw)*.15);font-weight:800;color:#111;letter-spacing:.01em}
+.card.back{background:linear-gradient(145deg,#1d3556,#0e1c30);border:4px solid #fff;outline:1px solid #b8902f;color:#e9d8a6;font-family:Fraunces,Georgia,serif}
+.card.back small{color:#d9b25a}
+.hand{background:rgba(27,47,74,.07);border-radius:16px;padding:22px 14px 10px;margin-top:10px}
+.hand .card.sel{box-shadow:0 0 0 3px #b8902f,0 10px 20px rgba(27,47,74,.3);border-color:#b8902f}
+.chip{background:#fff;color:#1b2f4a;border:1px solid #c9c2b0}
+.chip.turn{background:#1b2f4a;color:#fff;border-color:#1b2f4a;font-weight:600}
+.rule{background:#fff;color:#1c2733;border:none;border-left:5px solid #b8902f;border-radius:10px;text-align:left;box-shadow:0 4px 14px rgba(27,47,74,.12)}
+.bar{background:#d8d2c3}.bar i{background:#b8902f}
+.table figure{color:#5b6773}
+#die.go,.pile.go{animation:glow 1.2s infinite}
+@keyframes glow{50%{box-shadow:0 0 0 9px rgba(184,144,47,.4)}}
+.face{box-shadow:inset 0 0 8px rgba(0,0,0,.1)}
+.win{position:fixed;inset:0;background:rgba(14,28,48,.62);display:flex;align-items:center;justify-content:center;z-index:10;overflow:hidden;animation:fade .5s}
+@keyframes fade{from{opacity:0}}
+.wbox{position:relative;background:#fff;border:2px solid #b8902f;border-radius:22px;padding:28px 34px;text-align:center;max-width:420px;margin:16px;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:pop .7s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+.wbox h2{font-family:Fraunces,Georgia,serif;font-size:2.4rem;margin:.1em 0;color:#1b2f4a}
+.wbox p{color:#5b6773;margin:.3em 0 1.2em}
+.trophy{font-size:4.5rem;line-height:1;animation:bounce 1.2s ease-in-out infinite}
+@keyframes bounce{50%{transform:translateY(-10px) rotate(-6deg)}}
+.confetti span{position:absolute;top:-20px;width:10px;height:16px;border-radius:2px;animation:fall linear infinite}
+@keyframes fall{to{top:105%;margin-left:60px}}
+@media (prefers-reduced-motion:reduce){.confetti,.trophy,.wbox,.win{animation:none}.confetti{display:none}}
 </style></head><body><div id="app"></div>
 <script>
 // ---------- cards ----------
@@ -83,20 +127,21 @@ const FN=[[1,''],[6,'rotateY(180deg) '],[2,'rotateY(90deg) '],[5,'rotateY(-90deg
 const dieH=(n,anim)=>{const [x,y]=FACE[n||3];return `<div class="scene"><div class="tilt"><div class="cube${anim?' roll':''}" style="--x:${x}deg;--y:${y}deg">${FN.map(([k,t])=>`<div class="face" style="transform:${t}translateZ(40px)">${[0,1,2,3,4,5,6,7,8].map(i=>PIPS[k].includes(i)?'<i></i>':'<b></b>').join('')}</div>`).join('')}</div></div></div>`};
 function gfx(c,easy){const X=v=>50+v*3.4,Y=v=>50-v*3.4;let s='<svg viewBox="0 0 100 100">';
  for(let i=-12;i<=12;i+=3){s+=`<path d="M${X(i)} ${Y(-12)}V${Y(12)}M${X(-12)} ${Y(i)}H${X(12)}" stroke="#ddd" stroke-width=".4"/>`;
-  if(i)s+=`<text x="${X(i)}" y="${Y(0)+4.2}" font-size="3.2" text-anchor="middle" fill="#666">${f(i)}</text><text x="${X(0)-1.2}" y="${Y(i)+1.1}" font-size="3.2" text-anchor="end" fill="#666">${f(i)}</text>`}
+  if(i)s+=`<text x="${X(i)}" y="${Y(0)+4.2}" font-size="3.2" text-anchor="middle" fill="#444">${f(i)}</text><text x="${X(0)-1.2}" y="${Y(i)+1.1}" font-size="3.2" text-anchor="end" fill="#444">${f(i)}</text>`}
  s+=`<path d="M${X(-12)} ${Y(0)}H${X(12)}M${X(0)} ${Y(-12)}V${Y(12)}" stroke="#333" stroke-width=".8"/><text x="95" y="${Y(0)+1.2}" font-size="4" fill="#333">x</text><text x="${X(0)+2}" y="6" font-size="4" fill="#333">y</text>`;
  let a,b;if(c.v!==undefined){a=[c.v,-12];b=[c.v,12]}else{let lo=-12,hi=12;if(c.m){const p=(-12-c.c)/c.m,q=(12-c.c)/c.m;lo=Math.max(lo,Math.min(p,q));hi=Math.min(hi,Math.max(p,q))}a=[lo,c.m*lo+c.c];b=[hi,c.m*hi+c.c]}
  s+=`<path d="M${X(a[0])} ${Y(a[1])}L${X(b[0])} ${Y(b[1])}" stroke="#c0392b" stroke-width="1.4" stroke-linecap="round"/>`;
  if(easy){const x=xi(c),y=yi(c);if(typeof x==='number')s+=`<circle cx="${X(x)}" cy="${Y(0)}" r="2.6" fill="#e8820c"/>`;if(typeof y==='number')s+=`<circle cx="${X(0)}" cy="${Y(y)}" r="${x===0?1.6:2.6}" fill="#1f6fd1"/>`}
  return s+'</svg>'}
-const cardH=(id,easy,cls='')=>{const c=C[id];return `<div class="card ${cls}" data-c="${id}"><b>${eq(c)}</b>${gfx(c,easy)}${easy?`<div class="ie"><span class="b">y-int: ${iv(yi(c))}</span><span class="o">x-int: ${iv(xi(c))}</span></div>`:''}</div>`};
+const fs=t=>Math.min(.15,.82/[...t].reduce((a,h)=>a+(h===' '||h==='.'?.28:.6),0));
+const cardH=(id,easy,cls='')=>{const c=C[id];return `<div class="card ${cls}" data-c="${id}"><b style="font-size:calc(var(--cw)*${fs(eq(c))})">${eq(c)}</b>${gfx(c,easy)}${easy?`<div class="ie"><span class="b">y-int: ${iv(yi(c))}</span><span class="o">x-int: ${iv(xi(c))}</span></div>`:''}</div>`};
 const back=easy=>`<div class="card back">Rise &amp; Run${easy?'<small>EASY MODE</small>':''}</div>`;
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const $=s=>document.querySelector(s),app=$('#app');
 
 // ---------- host-side game engine ----------
-let G=null,hostPid=0,isHost=false,peer=null,conn=null,lob=[],cfg={},hcode='',V=null,sel=null,key='',lastRn=0,rolling=false,hint=false;
+let G=null,hostPid=0,isHost=false,peer=null,conn=null,lob=[],cfg={},hcode='',V=null,sel=null,key='',lastRn=0,rolling=false,hint=false,dismissed=false;
 function newGame(list){const d=shuf(C.map((_,i)=>i)),pl=shuf(list.slice());
  pl.forEach((p,i)=>{p.id=i;p.hand=d.splice(0,5);if(p.host)hostPid=i});
  G={players:pl,draw:d,disc:[d.pop()],turn:0,phase:'roll',die:null,pend:null,winner:null,rn:0,seq:0,timer:null,easy:cfg.easy,chal:cfg.chal,delay:cfg.delay,
@@ -140,12 +185,13 @@ function setup(){app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><p class="sub">A c
 <label><input type="radio" name="dk" value="std" checked> Standard deck (read the intercepts off the graph)</label>
 <label><input type="radio" name="dk" value="easy"> Easy mode deck (intercepts shown on each card)</label>
 <label><input type="checkbox" id="ch"> Challenge mode: any card can be played, but others may challenge it</label>
-<label>Time to challenge <select id="dl"><option>3</option><option selected>5</option><option>8</option><option>12</option></select> seconds</label>
+<label id="dlw" hidden>Time to challenge <select id="dl"><option>3</option><option selected>5</option><option>8</option><option>12</option></select> seconds</label>
 <label>Computer players <select id="bt"><option>0</option><option selected>1</option><option>2</option><option>3</option><option>4</option></select></label>
 <div class="row"><button id="solo">Play against the computer</button><button class="alt" id="host">Host a game for friends</button></div></div>
-<div class="panel"><b>Join a friend’s game</b><div class="row"><input type="text" id="jc" maxlength="4" size="6" placeholder="4-digit code" inputmode="numeric"><button class="alt" id="jn">Join</button></div></div>
+<div class="panel"><b>Join a friend’s game</b><div class="row"><input type="text" id="jc" class="codein" maxlength="4" placeholder="4-digit code" inputmode="numeric" autocomplete="off"><button class="alt" id="jn">Join</button></div></div>
 <div class="panel"><b>Make your own physical game</b><div class="row"><a href="rise_and_run_rules.pdf" download>Rules (PDF)</a><a href="rise_and_run_cards.pdf" download>Standard cards (PDF)</a><a href="rise_and_run_cards_easy_mode.pdf" download>Easy mode cards (PDF)</a></div></div>`;
  const rd=()=>({name:$('#nm').value.trim()||'Player',easy:document.querySelector('[name=dk]:checked').value==='easy',chal:$('#ch').checked,delay:+$('#dl').value,bots:+$('#bt').value});
+ $('#ch').onchange=e=>$('#dlw').hidden=!e.target.checked;
  $('#solo').onclick=()=>{cfg=rd();isHost=true;const n=Math.max(1,Math.min(5,cfg.bots));newGame([{name:cfg.name,host:true},...Array.from({length:n},(_,i)=>({name:'Computer '+(i+1),bot:true}))])};
  $('#host').onclick=()=>{cfg=rd();hostGame()};
  $('#jn').onclick=()=>/^\d{4}$/.test($('#jc').value)?joinGame($('#jc').value,rd().name):alert('Enter the 4-digit code.')}
@@ -173,6 +219,9 @@ function joinGame(code,name){isHost=false;app.innerHTML='<p>Connecting…</p>';p
   setTimeout(()=>{if(!conn.open){alert('Game not found. Check the code.');location.hash='';location.reload()}},9000)})}
 
 // ---------- game screen ----------
+function winH(v){const me=v.winner===v.you,cols=['#b8902f','#1b2f4a','#e8820c','#1f6fd1','#c0392b','#2e9e5b'];
+ const conf=Array.from({length:70},()=>`<span style="left:${Math.random()*100}%;background:${cols[Math.random()*6|0]};animation-delay:${Math.random()*2.5}s;animation-duration:${3+Math.random()*3}s;transform:rotate(${Math.random()*360}deg)"></span>`).join('');
+ return `<div class="win" role="dialog" aria-label="Game over"><div class="confetti">${conf}</div><div class="wbox"><div class="trophy">🏆</div><h2>${me?'You win!':esc(v.pl[v.winner].n)+' wins!'}</h2><p>${me?'You played your last card. Brilliant!':'They played their last card. You had '+v.hand.length+' card'+(v.hand.length==1?'':'s')+' left.'}</p><div class="row" style="justify-content:center"><button id="again2">Back to menu</button><button class="alt" id="view">View table</button></div></div></div>`}
 function show(v){V=v;const my=v.turn===v.you,ph=v.phase,k=v.turn+ph;
  if(k!==key){sel=null;hint=false;key=k}if(!v.hand.includes(sel))sel=null;
  const fresh=v.rn&&v.rn!==lastRn;if(fresh){lastRn=v.rn;rolling=true;setTimeout(()=>{rolling=false;show(V)},1000)}
@@ -197,12 +246,15 @@ function show(v){V=v;const my=v.turn===v.you,ph=v.phase,k=v.turn+ph;
  if(ph==='over')h+=`<div class="row" style="justify-content:center"><button id="again">Back to menu</button></div>`;
  h+=`<div class="hand">${v.hand.map(c=>cardH(c,v.easy,(c===sel?'sel ':'')+(hint&&canPlay&&v.die<6&&fits(c)?'hint':''))).join('')}</div>`;
  app.innerHTML=h;
+ if(ph==='over'&&!dismissed)app.insertAdjacentHTML('beforeend',winH(v));
  const g=id=>document.getElementById(id);
  if(g('die'))g('die').onclick=()=>send({t:'roll'});
  if(canDraw)g('pile').onclick=()=>send({t:'draw'});
  if(g('hn'))g('hn').onclick=()=>{hint=true;show(V)};
  if(g('ps'))g('ps').onclick=()=>send({t:'pass'});
  if(g('ch'))g('ch').onclick=()=>send({t:'chal'});
+ if(g('view'))g('view').onclick=()=>{dismissed=true;show(V)};
+ if(g('again2'))g('again2').onclick=()=>{location.hash='';location.reload()};
  if(g('again'))g('again').onclick=()=>{location.hash='';location.reload()};
  app.querySelectorAll('.hand .card').forEach(el=>el.onclick=()=>{if(!canPlay)return;const c=+el.dataset.c;if(sel===c){if(!bad||v.chal)send({t:'play',c});return}sel=c;show(V)})}
 
