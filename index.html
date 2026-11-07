@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en">
+<!-- © Ute Poelman. All rights reserved. Terms of use: https://nugget-maths.co.nz/#terms -->
+<head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rise &amp; Run</title>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -259,4 +261,6 @@ function show(v){V=v;const my=v.turn===v.you,ph=v.phase,k=v.turn+ph;
  app.querySelectorAll('.hand .card').forEach(el=>el.onclick=()=>{if(!canPlay)return;const c=+el.dataset.c;if(sel===c){if(!bad||v.chal)send({t:'play',c});return}sel=c;show(V)})}
 
 const m=location.hash.match(/join=(\d{4})/);m?joinScreen(m[1]):setup();
-</script></body></html>
+</script>
+<script src="https://nugget-maths.co.nz/notice.js" defer></script>
+</body></html>
