@@ -4,7 +4,8 @@
 <head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rise &amp; Run</title>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+<script>window.mqtt||document.write('<script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"><\/script>')</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--ink:#1c2733;--blue:#1f6fd1;--orange:#e8820c;--red:#c0392b;--felt:#e6ece8;--navy:#1b2f4a;--cw:clamp(84px,21vw,118px)}
@@ -143,7 +144,7 @@ const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i]
 const $=s=>document.querySelector(s),app=$('#app');
 
 // ---------- host-side game engine ----------
-let G=null,hostPid=0,isHost=false,peer=null,conn=null,lob=[],cfg={},hcode='',V=null,sel=null,key='',lastRn=0,rolling=false,hint=false,dismissed=false;
+let G=null,hostPid=0,isHost=false,mq=null,conn=null,lob=[],cfg={},hcode='',V=null,sel=null,key='',lastRn=0,rolling=false,hint=false,dismissed=false;
 function newGame(list){const d=shuf(C.map((_,i)=>i)),pl=shuf(list.slice());
  pl.forEach((p,i)=>{p.id=i;p.hand=d.splice(0,5);if(p.host)hostPid=i});
  G={players:pl,draw:d,disc:[d.pop()],turn:0,phase:'roll',die:null,pend:null,winner:null,rn:0,seq:0,timer:null,easy:cfg.easy,chal:cfg.chal,delay:cfg.delay,
@@ -205,20 +206,60 @@ function lobbyUI(){const link=location.href.split('#')[0]+'#join='+hcode,names=[
  $('#cp').onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(link);
  $('#go').onclick=()=>newGame([{name:cfg.name,host:true},...lob.map(c=>({name:c.pname,conn:c})),...Array.from({length:cfg.bots},(_,i)=>({name:'Computer '+(i+1),bot:true}))])}
 const bcast=()=>lob.forEach(c=>c.send({t:'lobby',names:[cfg.name,...lob.map(x=>x.pname)]}));
-function hostGame(){isHost=true;lob=[];const code=String(1000+Math.random()*9000|0);if(peer)peer.destroy();peer=new Peer('riserun-'+code);
- peer.on('error',e=>e.type==='unavailable-id'?hostGame():alert('Connection problem: '+e.type));
- peer.on('open',()=>{hcode=code;lobbyUI()});
- peer.on('connection',cn=>{
-  cn.on('data',d=>{if(!G){if(d.t==='hello'&&lob.length+1+cfg.bots<6){cn.pname=String(d.name||'Player').slice(0,16);lob.push(cn);lobbyUI();bcast()}}
-   else{const p=G.players.find(p=>p.conn===cn);if(p)act(p.id,d)}});
-  cn.on('close',()=>{if(!G){lob=lob.filter(x=>x!==cn);lobbyUI();bcast()}else{const p=G.players.find(p=>p.conn===cn);if(p){p.bot=true;p.conn=null;push()}}})})}
-function joinGame(code,name){isHost=false;app.innerHTML='<p>Connecting…</p>';peer=new Peer();
- peer.on('error',e=>{alert('Could not join: '+e.type);location.hash='';location.reload()});
- peer.on('open',()=>{conn=peer.connect('riserun-'+code,{reliable:true});
-  conn.on('open',()=>{conn.send({t:'hello',name});app.innerHTML='<p>Connected. Waiting for the host to start…</p>'});
-  conn.on('data',d=>{if(d.t==='lobby')app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><div class="panel"><b>Waiting for the host to start</b><ul>${d.names.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`;if(d.t==='v')show(d.v)});
-  conn.on('close',()=>app.insertAdjacentHTML('afterbegin','<p class="warn">Disconnected from the host.</p>'));
-  setTimeout(()=>{if(!conn.open){alert('Game not found. Check the code.');location.hash='';location.reload()}},9000)})}
+// ---------- networking: MQTT over secure WebSocket (works through most school firewalls) ----------
+// Each room uses its own topics. The host listens on <room>/host; each player listens on <room>/<their id>.
+const BROKER='wss://broker.emqx.io:8084/mqtt',NS='riserun-v1/',rnd=()=>Math.random().toString(36).slice(2,8);
+const fail=m=>{alert(m);location.hash='';location.reload()};
+function hostGame(){isHost=true;lob=[];const code=String(1000+Math.random()*9000|0),base=NS+code+'/',cons={};let started=false,live=false,taken=false;
+ if(mq)mq.end(true);
+ // a retained "alive" message marks a room as in use; clearing it is the last-will message if the host vanishes
+ mq=mqtt.connect(BROKER,{clientId:'rr_h_'+rnd(),clean:true,connectTimeout:8000,keepalive:30,will:{topic:base+'alive',payload:'',retain:true,qos:0}});
+ const me=mq,pub=(t,x)=>me.publish(t,JSON.stringify(x));
+ const guard=setTimeout(()=>{if(!started)fail('Could not reach the game server. Your network may be blocking it.')},12000);
+ me.on('connect',()=>{
+  if(started){me.publish(base+'alive','1',{retain:true});return}
+  started=true;clearTimeout(guard);
+  me.subscribe(base+'alive',()=>setTimeout(()=>{
+   if(taken){me.end(true);hostGame();return}
+   live=true;me.publish(base+'alive','1',{retain:true});me.subscribe(base+'host');hcode=code;lobbyUI()},1200))});
+ me.on('message',(t,p)=>{
+  if(t===base+'alive'){if(!live)taken=p.length>0;return}
+  let m;try{m=JSON.parse(p.toString())}catch(e){return}
+  const id=String(m.from||''),d=m.d||{};if(!id)return;let cn=cons[id];
+  if(d.t==='hello'){
+   if(!G){
+    if(!cn){if(lob.length+1+cfg.bots>=6){pub(base+id,{t:'full'});return}
+     cn=cons[id]={id,open:true,send:x=>pub(base+id,x)};lob.push(cn)}
+    cn.pname=String(d.name||'Player').slice(0,16);lobbyUI();bcast()}
+   else if(cn){const p=G.players.find(p=>p.conn===cn);if(p)cn.send({t:'v',v:view(p.id)})}
+   return}
+  if(!cn)return;
+  if(d.t==='bye'){delete cons[id];
+   if(!G){lob=lob.filter(x=>x!==cn);lobbyUI();bcast()}
+   else{const p=G.players.find(p=>p.conn===cn);if(p){p.bot=true;p.conn=null;push()}}
+   return}
+  if(G){const p=G.players.find(p=>p.conn===cn);if(p)act(p.id,d)}});
+ me.on('error',()=>{})}
+function joinGame(code,name){isHost=false;app.innerHTML='<p>Connecting…</p>';
+ const base=NS+code+'/',id='p'+rnd();let got=false,tries=0,warned=false;
+ if(mq)mq.end(true);
+ mq=mqtt.connect(BROKER,{clientId:'rr_'+id,clean:true,connectTimeout:8000,keepalive:30,will:{topic:base+'host',payload:JSON.stringify({from:id,d:{t:'bye'}}),qos:0}});
+ const me=mq,send=x=>me.publish(base+'host',JSON.stringify({from:id,d:x})),hello=()=>send({t:'hello',name});
+ conn={send};
+ me.on('connect',()=>{warned=false;me.subscribe([base+id,base+'alive'],()=>{if(!got)hello()})});
+ // keep knocking until the host answers; give up after about 15 seconds
+ const tm=setInterval(()=>{if(got){clearInterval(tm);return}
+  if(++tries>=5){clearInterval(tm);fail(me.connected?'Game not found. Check the code.':'Could not reach the game server. Your network may be blocking it.');return}
+  if(me.connected)hello()},3000);
+ me.on('message',(t,p)=>{
+  if(t===base+'alive'){if(!p.length&&got&&!warned){warned=true;app.insertAdjacentHTML('afterbegin','<p class="warn">Disconnected from the host.</p>')}return}
+  let d;try{d=JSON.parse(p.toString())}catch(e){return}
+  if(d.t==='full'){clearInterval(tm);fail('That game is full.');return}
+  got=true;
+  if(d.t==='lobby')app.innerHTML=`<h1>Rise <i>&amp;</i> Run</h1><div class="panel"><b>Waiting for the host to start</b><ul>${d.names.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`;
+  if(d.t==='v')show(d.v)});
+ me.on('close',()=>{if(got&&!warned){warned=true;app.insertAdjacentHTML('afterbegin','<p class="warn">Disconnected from the host.</p>')}});
+ me.on('error',()=>{})}
 
 // ---------- game screen ----------
 function winH(v){const me=v.winner===v.you,cols=['#b8902f','#1b2f4a','#e8820c','#1f6fd1','#c0392b','#2e9e5b'];
